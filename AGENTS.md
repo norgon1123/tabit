@@ -240,12 +240,16 @@ comment in `pyproject.toml` and `docs/technical-plan-phase-0-1.md`.
   `/api/recordings`, charts → `/api`); audio logic in `app/audio/`; Pydantic request/
   response shapes in `app/schemas.py`; ORM models in `app/models.py`.
 - **Frontend** — data fetching through TanStack Query hooks (`useChart`, `useRecordings`).
-  Beat math in `chart/beatMath.ts` / `chart/beatGrid.ts`; pixel↔time and time formatting
-  in `chart/timeMath.ts`; chart wrapping/layout in `chart/chartLayout.ts`. Shared UI
-  components live in `ui/` (`Button`, `Stack`, `Card`, `Field`, `Panel`); light/dark theming
-  in `theme/` (`ThemeContext`, `contrast.ts`). See `CONTEXT.md` for the chart page's
-  three-zone layout (`ChartContextBar` / `Timeline` / `ControlDeck`) and the
-  no-inline-style rule `ui/noInlineStyle.test.ts` enforces.
+  Beat math in `chart/beatMath.ts` (half-beat snap) / `chart/beatGrid.ts` (`totalBeats`,
+  `timeForBeat` — the port of `beatgrid.py`); pixel↔time and time formatting in
+  `chart/timeMath.ts`; segments+meter → bars/fragments in `chart/barLayout.ts`
+  (`buildBars`); boundary-drag / resize patch math in `chart/chartLayout.ts`. Chart seeding
+  (whole-beat snap with the bar-line pull) is backend-only: `app/chart_seed.py` +
+  `snap_chart_beat` in `app/audio/beatgrid.py`. Shared UI components live in `ui/`
+  (`Button`, `Stack`, `Card`, `Field`, `Panel`); light/dark theming in `theme/`
+  (`ThemeContext`, `contrast.ts`). See `CONTEXT.md` for the chart page's three-zone layout
+  (`ChartContextBar` / `Timeline` / `ControlDeck`) and the no-inline-style rule
+  `ui/noInlineStyle.test.ts` enforces.
 
 ## Configuration
 
@@ -256,7 +260,8 @@ Config is env-driven, prefix `TABIT_` (`app/config.py`). Don't hardcode paths or
   `413`), `TABIT_ANALYSIS_SAMPLE_RATE` (22050), `TABIT_ANALYSIS_MAX_WORKERS` (1),
   `TABIT_ANALYSIS_MIN_SEGMENT_SECONDS` (0.75), `TABIT_ANALYSIS_CHANGE_PENALTY` (1.0),
   `TABIT_ANALYSIS_USE_HPSS` (true), `TABIT_ANALYSIS_ENGINE`
-  (`chordino` | `librosa` | `btc`).
+  (`chordino` | `librosa` | `btc`), `TABIT_CHART_BAR_PULL_BEATS` (0.75; seed-time
+  bar-line pull; `snap_chart_beat` rejects values ≥ 1.0).
 - Session: `TABIT_SESSION_COOKIE_NAME`, `TABIT_SESSION_MAX_AGE_SECONDS`.
 - Guest: `TABIT_GUEST_COOKIE_NAME`, `TABIT_GUEST_TTL_SECONDS`.
 - Multi-instrument: `TABIT_ANALYSIS_DEVICE` (`auto`), `TABIT_ENABLE_SEPARATION` (false),
