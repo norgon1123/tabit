@@ -23,19 +23,19 @@ describe("Button", () => {
     expect(screen.getByRole("button")).toHaveAttribute("type", "submit");
   });
 
-  it("applies its variant as a class, not an inline style", () => {
-    render(<Button variant="primary">Go</Button>);
-    expect(screen.getByRole("button")).toHaveClass("primary");
-    expect(screen.getByRole("button").getAttribute("style")).toBeNull();
-  });
-
-  it("supports the danger and icon variants", () => {
-    const { rerender } = render(<Button variant="danger">Delete</Button>);
-    expect(screen.getByRole("button")).toHaveClass("danger");
-
-    rerender(<Button variant="icon" aria-label="Close">x</Button>);
-    expect(screen.getByRole("button", { name: "Close" })).toHaveClass("icon");
-  });
+  it.each(["primary", "danger", "icon"] as const)(
+    "applies the %s variant as a class, not an inline style",
+    (variant) => {
+      render(
+        <Button variant={variant} aria-label="Go">
+          Go
+        </Button>,
+      );
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass(variant);
+      expect(button.getAttribute("style")).toBeNull();
+    },
+  );
 
   it("does not fire when disabled", async () => {
     const onClick = vi.fn();

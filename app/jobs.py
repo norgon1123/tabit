@@ -76,7 +76,10 @@ def analyze_guest_recording(recording: GuestRecording, analyzer: Analyzer) -> No
         analysis.engine_version = result.engine_version
         # Trust the server-decoded length over the browser-reported duration.
         recording.duration_seconds = result.duration
-        recording.chart = _guest_chart(recording, build_chart_seed(result))
+        recording.chart = _guest_chart(
+            recording,
+            build_chart_seed(result, pull_beats=get_settings().chart_bar_pull_beats),
+        )
         # Last: the frontend fetches the chart as soon as it sees "done".
         analysis.status = "done"
     except Exception as exc:
@@ -125,7 +128,7 @@ def _seed_chart(db: Session, recording: Recording, result: AnalysisResult) -> No
     # #1: trust the server-decoded length over the browser-reported duration.
     recording.duration_seconds = result.duration
 
-    seed = build_chart_seed(result)
+    seed = build_chart_seed(result, pull_beats=get_settings().chart_bar_pull_beats)
     chart = ChordChart(
         recording_id=recording.id,
         key_tonic=seed.key_tonic,

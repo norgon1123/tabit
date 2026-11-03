@@ -104,20 +104,24 @@ describe.each(Object.entries(THEMES))("%s theme", (themeName, tokens) => {
   });
 
   it("makes the measure rule out-weigh the ordinary chord divider", () => {
-    // Two channels, not one: the bar line is heavier than --line by COLOUR (this test)
-    // and by WIDTH (3px vs 1px, in the CSS). A user who cannot see the colour difference
-    // still sees the weight difference. Hue is never the only channel.
+    // Two channels, not one: the bar line is heavier than --line by COLOUR (this test) and by
+    // WIDTH (2px vs 1px, in the CSS). A user who cannot see the colour difference still sees
+    // the weight difference. Hue is never the only channel — and since the bar became a boxed
+    // grid there is a third: the box is an enclosed shape, not a hue.
     const bar = contrastRatio(tokens["--bar-line"], tokens["--bg"]);
     const line = contrastRatio(tokens["--line"], tokens["--bg"]);
     expect(bar).toBeGreaterThan(line);
   });
 
-  it("keeps the decorative hairline perceptible even though WCAG does not govern it", () => {
-    // A card differs from the page by only ~1.05:1, so the border and the shadow are what
-    // make a card visible at all. A hairline at 1.4:1 is not doing that job. This is not a
-    // WCAG threshold — it is a floor we set ourselves, and it is why --line was split from
-    // --control-border rather than simply darkened.
-    expect(contrastRatio(tokens["--line"], tokens["--bg"])).toBeGreaterThanOrEqual(1.6);
+  // Decorative edges WCAG does NOT govern, held to a self-imposed 1.6:1 floor rather than the
+  // 3:1 of the PAIRS table — a card differs from the page by only ~1.05:1, so these edges (and
+  // the shadow) are what make a card, or a row of bars, visible at all. This is why --line was
+  // split from --control-border rather than simply darkened. [token, why it is decorative]
+  it.each([
+    ["--line", "the hairline around a card and between two chords in the same bar"],
+    ["--bar-line-h", "the top/bottom edge of a bar box — separates one row of bars from the next, a card's-edge job (the VERTICAL --bar-line is the WCAG-governed graphical object)"],
+  ])("keeps the decorative edge %s perceptible even though WCAG does not govern it", (token, _why) => {
+    expect(contrastRatio(tokens[token], tokens["--bg"])).toBeGreaterThanOrEqual(1.6);
   });
 
   it("has no leftover --panel token (renamed to --surface)", () => {

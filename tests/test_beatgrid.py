@@ -5,6 +5,7 @@ from app.audio.beatgrid import (
     ensure_grid,
     rescale_grid,
     rescale_windows,
+    snap_chart_beat,
     snap_half,
     time_for_beat,
     total_beats,
@@ -138,3 +139,67 @@ def test_whole_bpm_rounds_to_a_countable_tempo(raw, expected):
     # to zero is no tempo at all. (72.5 -> 72: banker's rounding, and nothing depends on
     # which way a .5 goes.)
     assert whole_bpm(raw) == expected
+
+
+# --- snap_chart_beat -----------------------------------------------------------------
+# 4/4 with no pickup: bar lines at 0, 4, 8, 12.
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        (3.4, 4.0),    # 0.6 from the bar line -> pulled
+        (7.6, 8.0),    # 0.4 -> pulled
+        (11.7, 12.0),  # 0.3 -> pulled
+        (6.3, 6.0),    # nearest bar is 2.3 away -> no pull, nearest whole beat
+    ],
+)
+def test_snap_chart_beat_pulls_to_a_nearby_bar_line(raw, expected):
+    assert snap_chart_beat(raw, 4, 0) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("beat", [0, 1, 2, 3, 4, 5, 6, 7, 8])
+def test_snap_chart_beat_never_relocates_a_whole_beat(beat):
+    """THE invariant. A boundary already on a whole beat is never moved.
+
+    This is the test that fails at pull_beats >= 1.0 — beats 1, 3, 5 and 7 sit exactly
+    1.0 from a bar line, so a 1.0 tolerance swallows beats 2 and 4 of every bar and
+    `| C G Am F |` collapses to a single chord. It is why the default is 0.75.
+    """
+    assert snap_chart_beat(float(beat), 4, 0) == pytest.approx(float(beat))
+
+
+def test_snap_chart_beat_ties_round_half_up_at_both_parities():
+    """Catches a naive round(): banker's gives 6 for 6.5 but 8 for 7.5."""
+    assert snap_chart_beat(6.5, 4, 0) == pytest.approx(7.0)
+    assert snap_chart_beat(7.5, 4, 0) == pytest.approx(8.0)
+
+
+def test_snap_chart_beat_honours_the_measure_offset():
+    # measure_offset 2 -> bar lines at 2, 6, 10.
+    assert snap_chart_beat(1.8, 4, 2) == pytest.approx(2.0)   # pulled to the shifted bar line
+    assert snap_chart_beat(4.4, 4, 2) == pytest.approx(4.0)   # 1.6 from a bar line -> nearest beat
+
+
+def test_snap_chart_beat_handles_three_four():
+    # 3/4: bar lines at 0, 3, 6. Beat 1 and 2 are 1.0 away -> preserved.
+    assert snap_chart_beat(2.5, 3, 0) == pytest.approx(3.0)   # 0.5 -> pulled
+    assert snap_chart_beat(1.0, 3, 0) == pytest.approx(1.0)   # invariant holds in 3/4 too
+    assert snap_chart_beat(2.0, 3, 0) == pytest.approx(2.0)
+
+
+def test_snap_chart_beat_clamps_a_negative_result_to_zero():
+    # -0.9 is 0.9 from the bar line at 0 (> the 0.75 pull), so it takes the nearest-whole-beat
+    # branch: round_half_up(-0.9) = -1.0, which the clamp must lift to 0.0. Without the
+    # max(0.0, ...) clamp this returns -1.0 — so this input actually exercises the clamp.
+    assert snap_chart_beat(-0.9, 4, 0) == pytest.approx(0.0)
+
+
+def test_snap_chart_beat_rejects_a_destructive_tolerance():
+    with pytest.raises(ValueError, match="pull_beats"):
+        snap_chart_beat(3.4, 4, 0, pull_beats=1.0)
+
+
+def test_snap_chart_beat_rejects_a_meterless_measure():
+    with pytest.raises(ValueError, match="beats_per_measure"):
+        snap_chart_beat(3.0, 0, 0)

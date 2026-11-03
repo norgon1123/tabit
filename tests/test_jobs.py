@@ -1,3 +1,5 @@
+import pytest
+
 from app.audio.analyzer import AnalysisResult
 from app.audio.segments import DetectedSegment
 from app.jobs import analyze_recording
@@ -195,6 +197,43 @@ def test_seed_chart_keeps_chords_that_end_before_the_first_detected_beat(db_sess
     assert segs[0].start_beat == 0.0
     # Each chord keeps a plausible length instead of the first two collapsing to nothing.
     assert all(s.end_beat - s.start_beat >= 4.0 for s in segs)
+
+
+def test_seed_threads_configured_bar_pull_beats(db_session, monkeypatch):
+    # The bar-line pull tolerance is a setting (TABIT_CHART_BAR_PULL_BEATS, default 0.75).
+    # A boundary at 1.65s -> beat 3.3 pulls to the downbeat 4.0 at 0.75, but to 3.0 at 0.1.
+    # Setting the env to 0.1 and asserting the seeded chart shows 3.0 proves app/jobs.py
+    # threads get_settings().chart_bar_pull_beats into build_chart_seed -- a dropped kwarg
+    # would fall back to the 0.75 default and seed 4.0 instead.
+    from app.config import get_settings
+    from app.jobs import _seed_chart
+    from app.audio.analyzer import AnalysisResult
+    from app.audio.segments import DetectedSegment
+    from app.models import Recording, User
+    from app.music_theory import Quality
+
+    user = User(username="pull", password_hash="x")
+    db_session.add(user); db_session.flush()
+    rec = Recording(user_id=user.id, original_filename="m.m4a", format="m4a",
+                    stored_path="/tmp/m.m4a", duration_seconds=8.0)
+    db_session.add(rec); db_session.flush()
+
+    grid = [round(i * 0.5, 3) for i in range(17)]  # 120 BPM, beats 0..16 over 8s
+    result = AnalysisResult(
+        bpm=120.0, key_tonic_pc=0, key_mode="major", duration=8.0,
+        segments=[DetectedSegment(0.0, 1.65, 0, Quality.MAJ),
+                  DetectedSegment(1.65, 4.0, 7, Quality.MAJ)],
+        beat_times=grid,
+    )
+    monkeypatch.setenv("TABIT_CHART_BAR_PULL_BEATS", "0.1")
+    get_settings.cache_clear()
+    try:
+        _seed_chart(db_session, rec, result)
+        db_session.commit()
+        segs = sorted(rec.chart.segments, key=lambda s: s.start_beat)
+        assert segs[0].end_beat == pytest.approx(3.0)  # would be 4.0 if the config didn't thread through
+    finally:
+        get_settings.cache_clear()
 
 
 def test_dispatcher_uses_configured_min_segment_seconds(monkeypatch):

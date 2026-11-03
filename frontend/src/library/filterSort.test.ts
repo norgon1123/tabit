@@ -19,8 +19,15 @@ const B = rec("b", "Autumn Leaves.m4a", "2026-06-03T00:00:00Z");
 const C = rec("c", "blue MONK.m4a", "2026-06-02T00:00:00Z");
 const all = [A, B, C];
 
-test("empty query returns all, sorted newest first", () => {
-  expect(filterAndSortRecordings(all, "", "newest").map((r) => r.id)).toEqual(["b", "c", "a"]);
+it.each([
+  ["newest", ["b", "c", "a"]],
+  ["oldest", ["a", "c", "b"]],
+] as const)("empty query returns all, sorted by created_at %s first", (direction, expectedIds) => {
+  const result = filterAndSortRecordings(all, "", direction);
+  // An empty query is the "everything" case: no filtering, the whole set comes back...
+  expect(result).toHaveLength(all.length);
+  // ...ordered by created_at in the requested direction.
+  expect(result.map((r) => r.id)).toEqual(expectedIds);
 });
 
 test("whitespace-only query matches all", () => {
@@ -29,10 +36,6 @@ test("whitespace-only query matches all", () => {
 
 test("filter is case-insensitive substring on filename", () => {
   expect(filterAndSortRecordings(all, "blue", "newest").map((r) => r.id)).toEqual(["c", "a"]);
-});
-
-test("oldest sort is ascending by created_at", () => {
-  expect(filterAndSortRecordings(all, "", "oldest").map((r) => r.id)).toEqual(["a", "c", "b"]);
 });
 
 test("no match returns empty array", () => {

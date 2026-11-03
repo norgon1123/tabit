@@ -10,17 +10,13 @@ test("logged-out user landing on / can try Tabit without an account", async () =
 
   // The front door is the upload area now, not a login wall.
   expect(await screen.findByRole("region", { name: /upload a recording/i })).toBeInTheDocument();
+  // Landmark navigation and the skip link both need a <main>; before this there was none,
+  // so a screen-reader user could not jump to the content of the page.
+  expect(await screen.findByRole("main")).toBeInTheDocument();
 });
 
 test("the saved-chart editor still requires an account", async () => {
   renderWithProviders(<App />, { route: "/recordings/r1" });
 
   expect(await screen.findByRole("heading", { name: /log in/i })).toBeInTheDocument();
-});
-
-test("gives every screen a main landmark to skip to", async () => {
-  // Landmark navigation and the skip link both need a <main>; before this there was none,
-  // so a screen-reader user could not jump to the content of any page.
-  renderWithProviders(<App />, { route: "/" });
-  expect(await screen.findByRole("main")).toBeInTheDocument();
 });

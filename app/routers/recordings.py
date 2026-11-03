@@ -1,4 +1,5 @@
 import os
+from typing import BinaryIO
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
@@ -18,6 +19,7 @@ from app.deps import (
 from app.guest import GuestRecording, GuestStore, get_guest_store
 from app.jobs import JobDispatcher, get_job_dispatcher
 from app.models import Analysis, Recording, User
+from app.rate_limit import limit_upload
 from app.schemas import AnalysisOut, RecordingOut, RecordingUpdate
 from app.security import generate_session_token, hash_token
 from app.storage import GUEST_OWNER, delete_audio, save_audio
@@ -50,6 +52,28 @@ def _enforce_length_limit(seconds: float | None, limit: float) -> None:
     )
 
 
+def upload_too_large(limit_bytes: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        detail=(
+            f"File is larger than the {limit_bytes / (1024 * 1024):g} MB limit. "
+            "Upload a shorter or compressed recording."
+        ),
+    )
+
+
+def read_capped(source: BinaryIO, limit_bytes: int) -> bytes:
+    """Read an upload, refusing it (413) once it passes `limit_bytes`.
+
+    The stream cap (app/body_limit.py) already bounds disk and bandwidth, but it allows for
+    multipart framing on top of the cap; this enforces the cap on the file itself. Reads at
+    most one byte past it."""
+    data = source.read(limit_bytes + 1)
+    if len(data) > limit_bytes:
+        raise upload_too_large(limit_bytes)
+    return data
+
+
 def _extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
 
@@ -71,7 +95,12 @@ def list_recordings(
     )
 
 
-@router.post("", response_model=RecordingOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=RecordingOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_upload)],
+)
 def upload_recording(
     response: Response,
     file: UploadFile = File(...),
@@ -87,7 +116,7 @@ def upload_recording(
     _enforce_length_limit(duration_seconds, limit)
 
     filename = file.filename or "recording"
-    data = file.file.read()
+    data = read_capped(file.file, get_settings().max_upload_bytes)
     if principal.user is None:
         return _upload_as_guest(
             response, filename, data, duration_seconds, principal, guests, dispatcher, limit

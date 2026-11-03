@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.audio.decode import ffmpeg_available
-from app.config import get_settings
+from app.body_limit import BodyLimitMiddleware
+from app.config import check_production_safety, get_settings
 from app.db import Base, engine
 from app.jobs import get_job_dispatcher
 from app.migrations import run_additive_migrations
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    check_production_safety(get_settings())
     Base.metadata.create_all(bind=engine)
     # create_all builds missing tables but never adds columns to existing ones,
     # so a pre-existing database keeps its stale schema. Bridge that gap (e.g.
@@ -50,6 +52,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Tabit", lifespan=lifespan)
+# Bodies are capped at the stream, before FastAPI parses or spools them (app/body_limit.py).
+app.add_middleware(BodyLimitMiddleware)
 app.include_router(auth.router)
 app.include_router(recordings.router)
 app.include_router(charts.router)

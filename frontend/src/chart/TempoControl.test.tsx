@@ -76,20 +76,18 @@ describe("TempoControl", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  test("halves the tempo — the fix for a double-time beat grid", async () => {
+  // Half/double each fix a mis-counted grid, and each must fire exactly once — the input's
+  // blur must not commit a stale draft on top of the rescale.
+  test.each([
+    [72, "Double-time", 144],
+    [144, "Half-time", 72],
+  ])("rescaling %d via %s fires onChange once with the new tempo", async (bpm, title, expected) => {
     const onChange = vi.fn();
-    render(<TempoControl bpm={144} onChange={onChange} busy={false} />);
+    render(<TempoControl bpm={bpm} onChange={onChange} busy={false} />);
     await openEditor();
-    await userEvent.click(screen.getByTitle("Half-time"));
-    expect(onChange).toHaveBeenCalledWith(72);
-  });
-
-  test("doubles the tempo", async () => {
-    const onChange = vi.fn();
-    render(<TempoControl bpm={72} onChange={onChange} busy={false} />);
-    await openEditor();
-    await userEvent.click(screen.getByTitle("Double-time"));
-    expect(onChange).toHaveBeenCalledWith(144);
+    await userEvent.click(screen.getByTitle(title));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(expected);
   });
 
   test("halving an odd tempo still asks for a whole number", async () => {
@@ -107,15 +105,6 @@ describe("TempoControl", () => {
     await openEditor();
     await userEvent.click(screen.getByTitle("Half-time"));
     expect(onChange.mock.calls[0][0]).toBe(21);
-  });
-
-  test("halving fires once — the input's blur must not commit a stale draft too", async () => {
-    const onChange = vi.fn();
-    render(<TempoControl bpm={144} onChange={onChange} busy={false} />);
-    await openEditor();
-    await userEvent.click(screen.getByTitle("Half-time"));
-    expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith(72);
   });
 
   test("a keyboard user can Tab from the tempo field to ÷2 and use it", async () => {

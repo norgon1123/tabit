@@ -44,16 +44,13 @@ describe("ThemeProvider", () => {
     document.documentElement.removeAttribute("data-theme");
   });
 
-  it("defaults to the OS preference when the user has never chosen", () => {
-    mockPrefersDark(true);
+  it.each([
+    [true, "dark"],
+    [false, "light"],
+  ])("defaults to the OS preference when the user has never chosen (prefers-dark=%s → %s)", (prefersDark, expected) => {
+    mockPrefersDark(prefersDark);
     renderProbe();
-    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
-  });
-
-  it("defaults to light when the OS prefers light", () => {
-    mockPrefersDark(false);
-    renderProbe();
-    expect(screen.getByTestId("theme")).toHaveTextContent("light");
+    expect(screen.getByTestId("theme")).toHaveTextContent(expected);
   });
 
   it("prefers the user's stored choice over the OS preference", () => {

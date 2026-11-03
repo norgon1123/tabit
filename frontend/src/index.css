@@ -23,9 +23,15 @@
                        the shadow are what make a card visible at all, not its fill.
      --control-border  the boundary of an input, select or button. A real UI component
                        boundary, so WCAG 1.4.11 applies: 3:1, enforced.
-     --bar-line        the measure rule on the chart. A graphical object that says "a bar
-                       starts here": 3:1, enforced, and heavier than --line by BOTH colour
-                       and width. Two channels, never hue alone.
+     --bar-line        the measure rule on the chart — the VERTICAL edge of a bar box. A
+                       graphical object that says "a bar starts here": 3:1, enforced, and
+                       heavier than --line by colour AND width.
+     --bar-line-h      the HORIZONTAL edge of a bar box (its top and bottom). NOT
+                       WCAG-governed, for the same reason --line is not: it is not a
+                       component boundary and it carries no meaning of its own — the
+                       vertical rule is what says "a bar starts here"; this only keeps one
+                       row of bars from bleeding into the next, which is a card's-edge job.
+                       Kept perceptible at ~1.8:1, like --line.
 
    Every value below has been checked — all 30 governed pairs clear AA in both themes. */
 
@@ -38,7 +44,8 @@
   --muted: #635a50;           /*                                    6.4:1 on bg */
   --line: #c4b8a6;            /* decorative hairline                1.9:1 — see above */
   --control-border: #958b7e;  /* input/button boundary              3.2:1 on bg, 3.4:1 on surface */
-  --bar-line: #7d7060;        /* the measure rule                   4.6:1 on bg */
+  --bar-line: #998E80;        /* bar box, vertical            3.06:1 on bg, 3.21:1 on surface */
+  --bar-line-h: #C3BBB1;      /* bar box, horizontal          1.81:1 — decorative, see above */
   --accent: #b8480f;          /* "now / active". Nothing else may borrow it.  5.0:1 on bg */
   --on-accent: #ffffff;       /* label on an accent fill            5.3:1 on accent */
   --danger: #b3261e;          /*                                    6.2:1 on bg */
@@ -54,7 +61,8 @@
   --muted: #a89d8d;           /*                                    6.7:1 on bg */
   --line: #4a443b;            /* decorative hairline                1.9:1 */
   --control-border: #787063;  /* input/button boundary              3.7:1 on bg, 3.3:1 on surface */
-  --bar-line: #9c9280;        /* the measure rule                   5.8:1 on bg */
+  --bar-line: #7F7768;        /* bar box, vertical            4.03:1 on bg, 3.67:1 on surface */
+  --bar-line-h: #544E45;      /* bar box, horizontal          2.17:1 — decorative, see above */
   --accent: #ff9d4d;          /*                                    8.7:1 on bg */
   --on-accent: #241505;       /*                                    8.6:1 on accent */
   --danger: #ff8a80;          /*                                    7.8:1 on bg */
@@ -104,6 +112,11 @@
      Wide enough for the longest label the app can produce (e.g. "F#m7"). */
   --chord-cell-min: 4.5rem;
 
+  /* How many bars sit on one line of the sheet. Four is the lead-sheet convention. This is a
+     TOKEN, not a JS constant, so a narrow viewport reflows with a media query instead of a
+     breakpoint in the render path. */
+  --bars-per-line: 4;
+
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: var(--leading-normal);
@@ -111,6 +124,10 @@
 
 [data-theme="dark"] {
   --shadow-panel: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
+@media (max-width: 600px) {
+  :root { --bars-per-line: 2; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); }
@@ -216,13 +233,56 @@ a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .skip-link { transition: none; } }
 
 /* ---- Chord chart ----------------------------------------------------------------------
-   The chart itself: a column of lines, each a row of chord cells. Chord cells are real
-   <button>s (Timeline.tsx) so a keyboard user can Tab to one and press Enter/Space to open
-   the segment editor — that focusability is what makes cutting drag-to-resize safe. */
+   The sheet is a GRID OF BARS, not a row of chords. Every bar is exactly one track wide
+   whatever it holds, so the bar lines form a hard vertical rule down the page — that
+   regularity is the thing that makes a chord grid scannable at playing speed.
+
+   A chord that vamps for eight bars is ONE segment (see barLayout.ts) rendered as eight
+   boxes. Only the first box is a <button>; the rest are aria-hidden. */
+.chart-bars {
+  display: grid;
+  /* minmax() rather than a bare 1fr: a bare 1fr is minmax(auto, 1fr), whose auto floor lets
+     a bar with four chords in it push its track wider than its neighbours — which knocks the
+     bar lines out of alignment between rows. The floor is the token, never the content. */
+  grid-template-columns: repeat(var(--bars-per-line), minmax(var(--chord-cell-min), 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* The frame's top and left only — the two outer edges no single bar can draw for itself.
+     Each bar closes its own bottom and right (below), so a PARTIAL final row still rules off
+     the row above it and the last chord: closure never waits on a neighbour that a short row
+     removed. Putting the far edges here instead would leave both gaps. */
+  border-top: 1px solid var(--bar-line-h);
+  border-left: 2px solid var(--bar-line);
+}
+
+.chart-bar {
+  display: flex;
+  min-width: 0;     /* never widen to fit content — see the minmax() note above */
+  overflow: hidden;
+  /* Trailing edges only: a bar rules off its OWN bottom and right so it stays closed with no
+     bar below or beside it (a partial last row). The container owns the top and left, so no
+     boundary is drawn twice — adjacent rows/bars still meet on a single 1px/2px seam. */
+  border-right: 2px solid var(--bar-line);
+  border-bottom: 1px solid var(--bar-line-h);
+}
+
+/* The flex CHILD of .chart-bar, carrying the beat-derived ratio set inline (Timeline.tsx).
+   For a chord's first box this wraps a real <button class="chord-cell">, so the geometry and
+   the button's role="listitem"-adjacent semantics don't collide on one element; a continuation
+   box has no separate button, so it carries this class alongside .chord-cell itself. */
+.chord-cell__item { display: flex; min-width: 0; overflow: hidden; }
+
+/* Chord cells are real <button>s (Timeline.tsx) so a keyboard user can Tab to one and press
+   Enter/Space to open the segment editor — that focusability is what makes cutting
+   drag-to-resize safe. A continuation box is a <span> with the same class: same look, no
+   focus, no announcement. */
 .chord-cell {
   position: relative;
-  width: 100%;                        /* fills its item; the item now carries the flex ratio */
-  min-width: var(--chord-cell-min);   /* sized from a token, never from content */
+  width: 100%;      /* fills its flex item (.chord-cell__item); a bare <button> sizes to its
+                        content otherwise, and the beat-derived ratio on the wrapper would
+                        stop reaching the box the player actually sees and clicks. */
+  min-width: 0;
   height: 64px;
   display: flex;
   flex-direction: column;
@@ -232,19 +292,23 @@ a { color: var(--accent); }
   font-family: var(--font-chart);
   font-variant-numeric: tabular-nums;
   background: transparent;
-  border: 1px solid transparent;
-  border-left: 1px solid var(--line);
+  border: 0;
   border-radius: 0;
   padding: var(--space-2);
   text-align: center;
   color: var(--text);
   transition: transform 120ms ease;   /* the current-chord lift; reduced-motion resets it below */
 }
-/* The measure rule. Heavier than --line by BOTH colour and width — two channels, so it
-   still reads as "a bar starts here" for someone who cannot see the colour difference.
-   Keep the width ratio at 3:1 (3px vs 1px), which is what the app already ships. */
-.chord-cell[data-bar-start="true"] { border-left: 3px solid var(--bar-line); }
-.chord-cell[data-selected="true"]  { border-left-color: var(--accent); }
+
+/* The divider between two chords sharing a bar. Lighter than the bar line by BOTH colour and
+   width, and dashed as a third channel: solid means "bar", dashed means "chord". This has to
+   target .chord-cell__item, not .chord-cell: for a chord's first box the visible .chord-cell
+   is nested inside the .chord-cell__item wrapper (so it is not a direct sibling of its
+   neighbour), while .chord-cell__item — the flex child of .chart-bar — always is, for both
+   chord-start and continuation boxes alike. */
+.chord-cell__item + .chord-cell__item { border-left: 1px dashed var(--line); }
+
+.chord-cell[data-selected="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* "Playing" gets THREE channels — colour, a border, AND a scale bump. Hue is never the only
    signal: the border is presence (not hue) and the scale is size (not hue), so "this chord is
@@ -299,11 +363,6 @@ a { color: var(--accent); }
 .chord-cell__resize--left { left: 0; }
 .chord-cell__resize--right { right: 0; }
 
-.chart-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.chart-line  { list-style: none; display: flex; justify-content: flex-start; gap: 0; }
-/* The flex CHILD, carrying the beat-derived ratio set inline. */
-.chord-cell__item { display: flex; min-width: 0; }
-
 /* ---- The docked editing panel --------------------------------------------------------
    Was: absolutely positioned, its `top` measured from the DOM on every chart change and
    every window resize, so it lined up with its chord's row. That was fragile, it fought
@@ -328,19 +387,19 @@ a { color: var(--accent); }
    on screen become the ones in use: the deck (to listen) and the guess panel (to answer).
    This is a MODE treatment, not a theme — it dims with opacity and desaturates with a filter,
    RELATIVE to whatever theme the user is in, so it never swaps a token and a dark-theme user
-   gets the spotlight too. The dimming is on .chart-lines only: the guess panel is a sibling,
+   gets the spotlight too. The dimming is on .chart-bars only: the guess panel is a sibling,
    and the deck is outside this subtree, so both stay fully lit without any re-lighting. */
 /* Desaturation ONLY — never opacity. `opacity` composites the chart toward the page and
    crushes text contrast (the masked "?" fell to 3.4:1, below the 4.5 AA floor); `saturate()`
    changes chroma, not luminance, so the chart stays fully AA-readable while visibly receding
    into a desaturated backdrop against the fully-saturated deck and guess panel. That relative
    saturation IS the spotlight. Verified by theme/contrastStates.test.ts. */
-.chart-workspace[data-practice="true"] .chart-lines {
+.chart-workspace[data-practice="true"] .chart-bars {
   filter: saturate(0.35);
   transition: filter 200ms ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .chart-workspace[data-practice="true"] .chart-lines { transition: none; }
+  .chart-workspace[data-practice="true"] .chart-bars { transition: none; }
 }
 
 /* ---- Zone 1: the context bar --------------------------------------------------------- */

@@ -79,6 +79,9 @@ def test_chordino_trims_leading_silence_from_beats_and_chords(tmp_path):
     assert min(result.beat_times) >= 1.2  # no beats inside the leading silence
     assert result.segments
     assert result.segments[0].start_time >= 1.2  # first chord starts at the music
+
+
+def test_chordino_reduces_extensions_to_the_five_qualities(tmp_path):
     path = tmp_path / "addninth.wav"
     # Cadd9 held; Chordino should read it as plain C major (one of the five qualities).
     _write_chord_song(path, [(0, 4, 7, 2)], seconds_each=3.0)

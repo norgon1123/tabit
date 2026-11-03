@@ -1,30 +1,6 @@
 import { snapHalfBeat } from "./beatMath";
 
-// how many measures fit on one line of the lead sheet.
-export const MEASURES_PER_LINE = 4;
-
 interface BeatSpan { start_beat: number; end_beat: number; }
-
-// Greedily fill each line until adding the next chord would exceed `beatsPerLine`,
-// so bar lines stay regular. A chord longer than a line gets its own line.
-export function groupIntoLines<T extends BeatSpan>(items: T[], beatsPerLine: number): T[][] {
-  const cap = Math.max(1, beatsPerLine);
-  const lines: T[][] = [];
-  let line: T[] = [];
-  let acc = 0;
-  for (const item of items) {
-    const len = Math.max(0.5, item.end_beat - item.start_beat);
-    if (line.length > 0 && acc + len > cap + 1e-6) {
-      lines.push(line);
-      line = [];
-      acc = 0;
-    }
-    line.push(item);
-    acc += len;
-  }
-  if (line.length > 0) lines.push(line);
-  return lines;
-}
 
 export interface SegmentUpdate {
   id: string;

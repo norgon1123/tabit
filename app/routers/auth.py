@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Session as SessionModel, User
+from app.rate_limit import limit_auth
 from app.schemas import Credentials, UserOut
 from app.security import (
     generate_session_token,
@@ -20,6 +21,11 @@ _settings = get_settings()
 
 
 def _start_session(db: DbSession, user: User, response: Response) -> None:
+    # Sessions are refused once expired, but one nobody presents again would linger; a new
+    # sign-in is the natural moment to clear the user's own stale ones.
+    for stale in user.sessions:
+        if stale.is_expired(_settings.session_max_age_seconds):
+            db.delete(stale)
     token = generate_session_token()
     db.add(SessionModel(user_id=user.id, token_hash=hash_token(token)))
     db.commit()
@@ -33,7 +39,12 @@ def _start_session(db: DbSession, user: User, response: Response) -> None:
     )
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_auth)],
+)
 def register(creds: Credentials, response: Response, db: DbSession = Depends(get_db)) -> User:
     exists = db.execute(select(User).where(User.username == creds.username)).scalar_one_or_none()
     if exists is not None:
@@ -50,7 +61,7 @@ def register(creds: Credentials, response: Response, db: DbSession = Depends(get
     return user
 
 
-@router.post("/login", response_model=UserOut)
+@router.post("/login", response_model=UserOut, dependencies=[Depends(limit_auth)])
 def login(creds: Credentials, response: Response, db: DbSession = Depends(get_db)) -> User:
     user = db.execute(select(User).where(User.username == creds.username)).scalar_one_or_none()
     if user is None or not verify_password(creds.password, user.password_hash):

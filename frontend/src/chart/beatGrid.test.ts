@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { totalBeats } from "./beatGrid";
+import { timeForBeat, totalBeats } from "./beatGrid";
 
 describe("totalBeats", () => {
   test("synthesizes a 120 BPM grid when no beat times are present (0.5s/beat)", () => {
@@ -33,5 +33,38 @@ describe("totalBeats", () => {
 
   test("duration exactly at the last onset yields that beat index", () => {
     expect(totalBeats([0, 1, 2, 3], 120, 3)).toBeCloseTo(3, 6);
+  });
+});
+
+describe("timeForBeat", () => {
+  // A steady 120 BPM grid: one beat every 0.5s, beat 0 at t=0. Mirrors GRID in
+  // tests/test_beatgrid.py — the two sides are ports of each other and must not drift.
+  const GRID = [0, 0.5, 1.0, 1.5, 2.0];
+
+  test("maps a beat on the grid to its onset", () => {
+    expect(timeForBeat(0, GRID, 120, 2)).toBeCloseTo(0);
+    expect(timeForBeat(2, GRID, 120, 2)).toBeCloseTo(1.0);
+  });
+
+  test("interpolates a half beat", () => {
+    expect(timeForBeat(1.5, GRID, 120, 2)).toBeCloseTo(0.75);
+  });
+
+  test("extrapolates past the last onset at the final interval, and clamps to duration", () => {
+    expect(timeForBeat(6, GRID, 120, 10)).toBeCloseTo(3.0);
+    expect(timeForBeat(6, GRID, 120, 2.5)).toBeCloseTo(2.5);
+  });
+
+  test("clamps below zero", () => {
+    expect(timeForBeat(-4, GRID, 120, 2)).toBeCloseTo(0);
+  });
+
+  test("falls back to a BPM division when the tracker found fewer than two onsets", () => {
+    expect(timeForBeat(2, [], 120, 10)).toBeCloseTo(1.0);
+  });
+
+  test("inverts totalBeats", () => {
+    const beats = totalBeats(GRID, 120, 1.75);
+    expect(timeForBeat(beats, GRID, 120, 1.75)).toBeCloseTo(1.75);
   });
 });

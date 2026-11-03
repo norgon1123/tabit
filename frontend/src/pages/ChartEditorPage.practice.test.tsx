@@ -147,8 +147,9 @@ test("a correct answer sticks even if the player moves straight on to the next c
 });
 
 // Practice mode's only interaction is clicking a chord, so a chord that cannot be reached
-// from the keyboard cannot be played at all — the cell announces itself as a button, and has
-// to behave like one.
+// from the keyboard cannot be played at all — the cell is a native <button> (wrapped in a
+// role="listitem" <span> so a vamp is one list entry, but the button itself keeps its native
+// role and keyboard behaviour) and has to answer to Enter.
 test("a masked chord opens with the keyboard", async () => {
   login();
   serveChart();

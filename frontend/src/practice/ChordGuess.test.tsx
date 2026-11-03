@@ -58,14 +58,6 @@ it("announces a wrong guess politely — it answers, it does not interrupt", asy
   expect(said).not.toHaveAttribute("role", "alert");
 });
 
-it("still announces a wrong guess at all — silence would be the worse bug", async () => {
-  render(<ChordGuess segment={SEGMENT} onSolved={vi.fn()} />);
-
-  await guess("C", "Major");
-
-  expect(screen.getByRole("status")).toHaveTextContent(/not that one/i);
-});
-
 test("a second wrong answer shakes again", async () => {
   const { container } = render(<ChordGuess segment={SEGMENT} onSolved={vi.fn()} />);
 

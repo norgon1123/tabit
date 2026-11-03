@@ -85,22 +85,43 @@ def test_delete_segment(client, tmp_path, monkeypatch):
     assert client.get(f"/api/recordings/{rec_id}/chart").json()["segments"] == []
 
 
-def test_transpose_shifts_key_and_chords_but_keeps_numerals(client, tmp_path, monkeypatch):
-    rec_id, chart_id = _make_chart(client, monkeypatch, tmp_path)
-    # At synthesized 120 BPM (0.5s/beat): 4 beats = 2s, keep segments non-overlapping
-    for root, sb, eb in (("C", 0.0, 4.0), ("F", 4.0, 8.0), ("G", 8.0, 12.0)):
+@pytest.mark.parametrize(
+    "semitones, segments, expected_key, expected_roots, expected_numerals",
+    [
+        pytest.param(
+            2,
+            # At synthesized 120 BPM (0.5s/beat): 4 beats = 2s, keep segments non-overlapping
+            (("C", 0.0, 4.0, "maj"), ("F", 4.0, 8.0, "maj"), ("G", 8.0, 12.0, "maj")),
+            "D",
+            ["D", "G", "A"],
+            ["I", "IV", "V"],
+            id="up-two-sharp-spelling",
+        ),
+        pytest.param(
+            -2,
+            (("C", 0.0, 4.0, "maj"), ("A", 4.0, 8.0, "min")),
+            "Bb",
+            ["Bb", "G"],
+            ["I", "vi"],
+            id="down-two-flat-spelling",
+        ),
+    ],
+)
+def test_transpose_shifts_chords_and_spells_per_target_key(
+    client, tmp_path, monkeypatch, semitones, segments, expected_key, expected_roots, expected_numerals
+):
+    rec_id, chart_id = _make_chart(client, monkeypatch, tmp_path)  # C major
+    for root, sb, eb, quality in segments:
         client.post(
             f"/api/charts/{chart_id}/segments",
-            json={"start_beat": sb, "end_beat": eb, "chord_root": root, "chord_quality": "maj"},
+            json={"start_beat": sb, "end_beat": eb, "chord_root": root, "chord_quality": quality},
         )
-    resp = client.post(f"/api/charts/{chart_id}/transpose", json={"semitones": 2})
+    resp = client.post(f"/api/charts/{chart_id}/transpose", json={"semitones": semitones})
     assert resp.status_code == 200
     chart = resp.json()
-    assert chart["key_tonic"] == "D"
-    roots = [s["chord_root"] for s in chart["segments"]]
-    numerals = [s["roman_numeral"] for s in chart["segments"]]
-    assert roots == ["D", "G", "A"]
-    assert numerals == ["I", "IV", "V"]
+    assert chart["key_tonic"] == expected_key
+    assert [s["chord_root"] for s in chart["segments"]] == expected_roots
+    assert [s["roman_numeral"] for s in chart["segments"]] == expected_numerals
 
 
 def test_chart_access_scoped_to_owner(client, tmp_path, monkeypatch):
@@ -112,18 +133,6 @@ def test_chart_access_scoped_to_owner(client, tmp_path, monkeypatch):
         f"/api/charts/{chart_id}/segments",
         json={"start_beat": 0.0, "end_beat": 2.0, "chord_root": "C", "chord_quality": "maj"},
     ).status_code == 404
-
-
-def test_transpose_into_flat_key_uses_flat_spelling(client, tmp_path, monkeypatch):
-    rec_id, chart_id = _make_chart(client, monkeypatch, tmp_path)  # C major
-    client.post(f"/api/charts/{chart_id}/segments",
-                json={"start_beat": 0.0, "end_beat": 4.0, "chord_root": "C", "chord_quality": "maj"})
-    client.post(f"/api/charts/{chart_id}/segments",
-                json={"start_beat": 4.0, "end_beat": 8.0, "chord_root": "A", "chord_quality": "min"})
-    chart = client.post(f"/api/charts/{chart_id}/transpose", json={"semitones": -2}).json()
-    assert chart["key_tonic"] == "Bb"
-    assert [s["chord_root"] for s in chart["segments"]] == ["Bb", "G"]
-    assert [s["roman_numeral"] for s in chart["segments"]] == ["I", "vi"]
 
 
 def test_update_chart_settings(client, tmp_path, monkeypatch):

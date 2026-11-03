@@ -39,3 +39,28 @@ export function totalBeats(beatTimes: number[], bpm: number | null, duration: nu
   while (i < last && grid[i + 1] <= duration) i += 1;
   return i + (duration - grid[i]) / intervalAt(grid, i);
 }
+
+/** Beat index -> seconds, clamped to [0, duration]. The inverse of totalBeats' mapping, and
+ *  the port of app/audio/beatgrid.py::time_for_beat — keep the two in step.
+ *
+ *  Beat 0 is grid[0], which is not necessarily t=0, so positions below it extrapolate at the
+ *  opening interval rather than collapsing to zero. */
+export function timeForBeat(
+  beat: number,
+  beatTimes: number[],
+  bpm: number | null,
+  duration: number,
+): number {
+  const grid = ensureGrid(beatTimes, bpm, duration);
+  const last = grid.length - 1;
+  let seconds: number;
+  if (beat <= 0) {
+    seconds = grid[0] + beat * intervalAt(grid, 0);
+  } else if (beat >= last) {
+    seconds = grid[last] + (beat - last) * intervalAt(grid, last);
+  } else {
+    const i = Math.floor(beat);
+    seconds = grid[i] + (beat - i) * intervalAt(grid, i);
+  }
+  return Math.max(0, Math.min(duration, seconds));
+}

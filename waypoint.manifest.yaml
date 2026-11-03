@@ -196,6 +196,14 @@ agents:
       - v0-prompt
 documents:
   constitution: .waypoint/constitution.md
-  specs: {}
+  specs:
+    discovery:
+      path: .waypoint/specs/discovery.md
+      status: complete
+      created: 2026-11-03
+      summary: >-
+        Brownfield discovery. Stack/architecture map, WayPoint-vs-code mismatch, 16 risks
+        (security: upload byte cap, rate limiting, session expiry, prod cookie guard).
+      keywords: [discovery, risks, security, constitution, brownfield]
   plans: {}
   tasks: {}

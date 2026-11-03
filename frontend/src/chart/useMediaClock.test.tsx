@@ -56,7 +56,7 @@ test("seek clamps to [0, duration] and updates currentTime", () => {
   expect(clock.currentTime).toBe(0);
 });
 
-test("plays, pauses, and toggles the element behind the ref", () => {
+test("plays and pauses the element behind the ref", () => {
   let clock!: MediaClock;
   function Harness() {
     clock = useMediaClock();

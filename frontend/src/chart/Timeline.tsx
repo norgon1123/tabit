@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SegmentOut } from "../api/types";
-import {
-  boundaryUpdates,
-  groupIntoLines,
-  MEASURES_PER_LINE,
-  type SegmentUpdate,
-} from "./chartLayout";
+import { boundaryUpdates, type SegmentUpdate } from "./chartLayout";
+import { buildBars } from "./barLayout";
+import { timeForBeat } from "./beatGrid";
 import { beatSlashMarks, clampBeatBoundary } from "./beatMath";
 import { paintChordFill } from "./chordProgress";
 import { chordLabel } from "../api/music";
@@ -70,8 +67,11 @@ export default function Timeline({
     () => new Map(ordered.map((s, i) => [s.id, i] as const)),
     [ordered],
   );
-  const beatsPerLine = Math.max(1, beatsPerMeasure) * MEASURES_PER_LINE;
-  const lines = groupIntoLines(ordered, beatsPerLine);
+  const bars = useMemo(
+    () => buildBars(ordered, beatsPerMeasure, measureOffset),
+    [ordered, beatsPerMeasure, measureOffset],
+  );
+  const segmentById = useMemo(() => new Map(ordered.map((s) => [s.id, s])), [ordered]);
   const suppressClick = useRef(false);
 
   // The chord under the playhead, derived from currentTime (seconds). A precise
@@ -91,23 +91,59 @@ export default function Timeline({
     return () => window.clearTimeout(timer);
   }, [ordered, currentTime, playing, rate]);
 
-  // Drive the active chord's fill with a compositor (GPU) CSS transition: arm it
-  // toward 100% over the chord's remaining real time while playing, or snap it to
-  // the true fraction while paused. Re-runs each timeupdate to re-sync any drift.
-  const fillRef = useRef<HTMLSpanElement | null>(null);
+  // ONE FILL PER BOX of the active chord. A chord vamping across eight bars is eight boxes, and
+  // .chord-progress answers exactly one question — how much of this chord is left? A fill pinned
+  // to the first box would finish eight bars early and answer nothing.
+  const fillRefs = useRef(new Map<string, HTMLSpanElement>());
+
+  // Each box's own start/end time. Times come from timeForBeat — NOT from interpolating the
+  // segment's own start_time/end_time, which would be a second implementation of beat<->time
+  // that drifts against the grid (CLAUDE.md: one home per side). `isChordStart` rides along so
+  // the effect can tell the chord's FIRST box (which must arm even when the media clock lags
+  // just short of the chord's start) from a genuinely-future box (which must stay empty).
+  const activeFills = useMemo(() => {
+    const out = new Map<
+      string,
+      { startTime: number; endTime: number; isChordStart: boolean }
+    >();
+    if (!activeId) return out;
+    for (const bar of bars) {
+      for (const f of bar.fragments) {
+        if (f.segmentId !== activeId) continue;
+        out.set(`${f.segmentId}-${bar.index}`, {
+          startTime: timeForBeat(f.startBeat, grid.beatTimes, grid.bpm, grid.duration),
+          endTime: timeForBeat(f.startBeat + f.beats, grid.beatTimes, grid.bpm, grid.duration),
+          isChordStart: f.isChordStart,
+        });
+      }
+    }
+    return out;
+  }, [activeId, bars, grid]);
+
   useEffect(() => {
-    const fill = fillRef.current;
-    if (!fill) return;
-    const seg = ordered.find((s) => s.id === activeId);
-    if (!seg) return;
-    paintChordFill(fill, {
-      startTime: seg.start_time,
-      endTime: seg.end_time,
-      currentTime,
-      playing,
-      rate,
-    });
-  }, [activeId, ordered, currentTime, playing, rate]);
+    for (const [key, { startTime, endTime, isChordStart }] of activeFills) {
+      const el = fillRefs.current.get(key);
+      if (!el) continue;
+      if (currentTime >= endTime) {
+        el.style.transition = "none";
+        el.style.transform = "scaleX(1)";   // already played
+      } else if (currentTime < startTime && !isChordStart) {
+        // A genuinely-future box of a multi-bar vamp. paintChordFill CLAMPS currentTime into
+        // the window it is handed, so a future box would paint scaleX(0) and then transition to
+        // full over its OWN duration — hand it every unplayed box and the whole vamp fills at
+        // once. Future boxes are therefore set empty with no transition. The chord's FIRST box
+        // is excluded from this branch: when the media clock lags just short of the chord's
+        // start (the boundary timer has flipped the active chord but timeupdate hasn't caught
+        // up), that first box IS the sounding box and must arm its transition — paintChordFill's
+        // clamp turns the stale reading into a clean scaleX(0) start.
+        el.style.transition = "none";
+        el.style.transform = "scaleX(0)";   // not yet
+      } else {
+        // The box that is actually sounding (or the first box under a lagging clock).
+        paintChordFill(el, { startTime, endTime, currentTime, playing, rate });
+      }
+    }
+  }, [activeFills, currentTime, playing, rate]);
 
   // Reveal-as-reward: when a chord is named it leaves the masked set, and the cell it was
   // hiding in should settle the chord into place — the reward IS the information appearing,
@@ -162,73 +198,110 @@ export default function Timeline({
   }
 
   return (
-    <ul className="chart-lines" aria-label="Chord chart">
-      {lines.map((line, li) => (
-        // A LINE is a layout artefact — the chart wraps at whatever width the window happens
-        // to be, and a line break means nothing musically. role="presentation" keeps it out of
-        // the accessibility tree: a screen-reader user must not be told about a break that a
-        // wider window would remove. The chords are the list; the lines are just where they
-        // landed today.
-        <li key={li} className="chart-line" role="presentation">
-          {line.map((s) => {
+    <ul className="chart-bars" aria-label="Chord chart">
+      {bars.map((bar) => (
+        // A BAR is a real musical object, but it is not a list entry — the CHORDS are the
+        // list. A chord spanning eight bars is one chord in eight boxes, and role="presentation"
+        // is what keeps a screen-reader user from being told about the seven splits that a
+        // different time signature would move.
+        <li key={bar.index} className="chart-bar" role="presentation">
+          {bar.fragments.map((f) => {
+            const s = segmentById.get(f.segmentId)!;
             const i = indexById.get(s.id)!;
             const selected = s.id === selectedId;
             const isActive = s.id === activeId;
             const masked = maskedIds.has(s.id);
-            const beats = Math.max(0.5, s.end_beat - s.start_beat);
-            // A bar line is drawn on the left edge of cells that start a measure.
-            const onMeasure =
-              Math.abs(((s.start_beat - measureOffset) % beatsPerMeasure)) < 1e-6;
+            const chordBeats = Math.max(0.5, s.end_beat - s.start_beat);
 
-            // A sighted player reads position, length and the bar line off the page instantly.
-            // "C, button" — which is all the old markup said — gave a screen-reader user none
-            // of it.
+            const label = [
+              masked ? "Hidden chord" : chordLabel(s.chord_root, s.chord_quality),
+              formatMusicalPosition(barBeatAt(grid, s.start_time)),
+              `${chordBeats} ${chordBeats === 1 ? "beat" : "beats"}`,
+            ].join(", ");
+
+            const body = (
+              <>
+                <strong>{masked ? "?" : chordLabel(s.chord_root, s.chord_quality)}</strong>
+                <span className="muted slash-marks">{beatSlashMarks(f.beats)}</span>
+                <span className="muted">{masked ? "" : s.roman_numeral}</span>
+                {/* Every box of the active chord gets a fill — the effect above decides which
+                    are full, which are empty, and which is sweeping. */}
+                {isActive && (
+                  <span
+                    ref={(el) => {
+                      const key = `${s.id}-${bar.index}`;
+                      if (el) fillRefs.current.set(key, el);
+                      else fillRefs.current.delete(key);
+                    }}
+                    aria-hidden
+                    className="chord-progress"
+                    style={{ transform: "scaleX(0)" }}
+                  />
+                )}
+              </>
+            );
+
+            const dataAttrs = {
+              "data-segment-id": s.id,
+              "data-selected": selected ? "true" : undefined,
+              "data-playing": isActive ? "true" : undefined,
+              "data-masked": masked ? "true" : undefined,
+              "data-revealed": revealed.has(s.id) ? "true" : undefined,
+            } as const;
+
+            // A CONTINUATION box: the same chord, still sounding, in a later bar. It is
+            // aria-hidden and unfocusable so the chord is announced once and takes one tab
+            // stop — but it stays clickable, because a player aiming at any box of a vamp
+            // means "this chord". The chord's real END may land on a continuation box (a vamp
+            // ends on its last box, which is never the first), so the RIGHT resize handle
+            // rides `isChordEnd` wherever it falls — the left handle stays on the first box.
             //
-            // A MASKED chord keeps its secret but keeps its position and its length: in
-            // practice mode the chord is the question, but the rhythm is the question's
-            // CONTEXT and a player needs something to guess against.
-            const what = masked ? "Hidden chord" : chordLabel(s.chord_root, s.chord_quality);
-            const where = formatMusicalPosition(barBeatAt(grid, s.start_time)); // "bar 3, beat 1"
-            const howLong = `${beats} ${beats === 1 ? "beat" : "beats"}`;
-            // The measure rule is a graphical object. A screen reader cannot see 3px of
-            // --bar-line, so it has to be said.
-            const startsBar = onMeasure ? ", starts a bar" : "";
-
-            const label = `${what}, ${where}, ${howLong}${startsBar}`;
+            // There is no separate button here, so this single element plays both parts: the
+            // chord-cell appearance AND the flex child of .chart-bar — hence both classes.
+            if (!f.isChordStart) {
+              return (
+                <span key={`${s.id}-${bar.index}`} {...dataAttrs}
+                      className="chord-cell chord-cell__item" aria-hidden
+                      // Runtime geometry ONLY: the fragment's width IS its beat count within
+                      // this bar. It must sit here — this element is the flex child of
+                      // .chart-bar.
+                      style={{ flex: `${f.beats} 1 0` }}
+                      onClick={() => {
+                        // Same guard as the button: swallow the click the browser fires after a
+                        // pointer drag that began on this box's resize handle (a vamp's right
+                        // handle lives here), so a resize never doubles as a select + seek.
+                        if (suppressClick.current) { suppressClick.current = false; return; }
+                        onSelect(s.id);
+                        onSeek?.(s.start_time);
+                      }}>
+                  {body}
+                  {onResizeCommit && f.isChordEnd && (
+                    <span className="chord-cell__resize chord-cell__resize--right"
+                      aria-label={`Resize end of ${chordLabel(s.chord_root, s.chord_quality)}`}
+                      draggable={false}
+                      onPointerDown={(e) => startResize(i, "right", e)}
+                      onClick={(e) => e.stopPropagation()} />
+                  )}
+                </span>
+              );
+            }
 
             return (
-              <span
-                key={s.id}
-                role="listitem"
-                className="chord-cell__item"
-                // Runtime geometry ONLY: the cell's width IS the chord's beat count. This
-                // moved off the <button> and onto its wrapper, because the wrapper is now the
-                // flex child. Losing it makes every chord the same width — and NO a11y test
-                // would catch that.
-                style={{ flex: `${beats} 1 0` }}
-              >
-                <button
-                  type="button"
-                  className="chord-cell"
-                  data-bar-start={onMeasure ? "true" : undefined}
-                  data-selected={selected ? "true" : undefined}
-                  data-playing={isActive ? "true" : undefined}
-                  data-masked={masked ? "true" : undefined}
-                  data-revealed={revealed.has(s.id) ? "true" : undefined}
-                  aria-pressed={selected}
-                  aria-label={label}
-                  data-segment-id={s.id}
+              // The chord is ONE list entry (role="listitem") wrapping a real <button> — a
+              // vamp spanning eight bars must still be one item, but the button's NATIVE role
+              // must survive so assistive tech announces an activatable control, not a plain
+              // list row. role="listitem" therefore sits on the outer <span>, which also
+              // carries the flex geometry (it is the flex child of .chart-bar); the inner
+              // <button> carries the interaction and the label.
+              <span key={`${s.id}-${bar.index}`} role="listitem" className="chord-cell__item"
+                style={{ flex: `${f.beats} 1 0` }}>
+                <button type="button" className="chord-cell" {...dataAttrs}
+                  aria-pressed={selected} aria-label={label}
                   onClick={() => {
-                    if (suppressClick.current) {
-                      suppressClick.current = false;
-                      return;
-                    }
+                    if (suppressClick.current) { suppressClick.current = false; return; }
                     onSelect(s.id);
                     onSeek?.(s.start_time);
                   }}
-                  // The cell says it is a button, so it has to answer to one. In practice mode
-                  // this is the only way in: clicking a chord *is* the question, and a player on
-                  // the keyboard would otherwise have no way to name a single one.
                   onKeyDown={(e) => {
                     if (e.key !== "Enter" && e.key !== " ") return;
                     e.preventDefault(); // Space scrolls the page otherwise
@@ -237,38 +310,19 @@ export default function Timeline({
                   }}
                 >
                   {onResizeCommit && (
-                    <span
-                      className="chord-cell__resize chord-cell__resize--left"
+                    <span className="chord-cell__resize chord-cell__resize--left"
                       aria-label={`Resize start of ${chordLabel(s.chord_root, s.chord_quality)}`}
                       draggable={false}
                       onPointerDown={(e) => startResize(i, "left", e)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                      onClick={(e) => e.stopPropagation()} />
                   )}
-                  <strong>{masked ? "?" : chordLabel(s.chord_root, s.chord_quality)}</strong>
-                  <span className="muted slash-marks">{beatSlashMarks(beats)}</span>
-                  {/* The roman numeral names the chord's degree — against a key the player can
-                      see, that is the answer. Masked cells go without it. */}
-                  <span className="muted">{masked ? "" : s.roman_numeral}</span>
-                  {onResizeCommit && (
-                    <span
-                      className="chord-cell__resize chord-cell__resize--right"
+                  {body}
+                  {onResizeCommit && f.isChordEnd && (
+                    <span className="chord-cell__resize chord-cell__resize--right"
                       aria-label={`Resize end of ${chordLabel(s.chord_root, s.chord_quality)}`}
                       draggable={false}
                       onPointerDown={(e) => startResize(i, "right", e)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
-                  {isActive && (
-                    <span
-                      ref={fillRef}
-                      aria-hidden
-                      className="chord-progress"
-                      // Runtime geometry ONLY: how far through the chord we are, repainted
-                      // per-frame by chordProgress.ts. Everything else about this element
-                      // (position, size, colour) lives in CSS.
-                      style={{ transform: "scaleX(0)" }}
-                    />
+                      onClick={(e) => e.stopPropagation()} />
                   )}
                 </button>
               </span>

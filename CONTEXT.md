@@ -41,12 +41,23 @@ beat grid; wall-clock times are *derived*, never stored.
 - The **beat grid** (`Analysis.beat_times` → copied to `ChordChart.beat_times`) is an
   ascending list of detected beat-onset times in seconds; index *i* is beat *i*.
 - `app/audio/beatgrid.py` is the only place beat↔time conversion lives
-  (`time_for_beat`, `beat_for_time`, `total_beats`, `snap_half`, `ensure_grid`).
-  Positions between/beyond onsets are linearly interpolated/extrapolated.
+  (`time_for_beat`, `beat_for_time`, `total_beats`, `ensure_grid`, `rescale_grid`) along
+  with the snapping rules (`snap_half`, `snap_chart_beat`) and `whole_bpm`. Positions
+  between/beyond onsets are linearly interpolated/extrapolated. The frontend port is
+  `frontend/src/chart/beatGrid.ts` (`totalBeats`, `timeForBeat`).
 - The API accepts **beats** on write (`start_beat`/`end_beat`) and returns **both** beats
   and derived `start_time`/`end_time` seconds on read (`SegmentOut`).
 - Editing quantizes to the **half-beat** (eighth): `snap_half` on the backend,
   `snapHalfBeat` in `frontend/src/chart/beatMath.ts`; minimum segment length 0.5 beats.
+- **Seeding is stricter than editing.** When a chart is first built from an analysis,
+  detected boundaries snap to **whole beats**, and a boundary within
+  `TABIT_CHART_BAR_PULL_BEATS` (0.75) of a bar line takes the bar line
+  (`snap_chart_beat`). The engine emits far more spurious half-beat changes than real ones;
+  a player dragging a boundary does not, so manual edits keep the half-beat. The pull must
+  stay `< 1.0` — at 1.0 it swallows beats 2 and 4 of every 4/4 bar.
+- **The sheet's layout unit is the bar, not the chord.** A chord that vamps for eight bars
+  is *one* segment in the database and eight *fragments* on screen
+  (`frontend/src/chart/barLayout.ts`); the split is derived, never stored.
 - Derived times are **displayed** centisecond-quantized (`roundCs` / `formatTimeCs` in
   `frontend/src/chart/timeMath.ts`).
 
@@ -92,7 +103,8 @@ guest gets a `401` from), audio kept on disk, and several songs at once.
   guest), current-user + owned-recording resolution, Argon2 hashing.
 - `guest.py`, `chart_store.py`, `chart_seed.py` — the account-free path: the in-memory guest
   store, the user/guest storage seam the chart router talks to, and the chart seeding both
-  analysis paths share.
+  analysis paths share (`build_chart_seed` — storage-agnostic; the whole-beat / bar-line
+  snapping lives here, not in `jobs.py`).
 - `storage.py` — uploaded audio under `TABIT_STORAGE_DIR` (atomic write via temp+rename);
   guest audio goes to `_guest/` and is swept at startup.
 - `jobs.py` — `JobDispatcher` (thread pool), `analyze_recording`, `analyze_guest_recording`
@@ -103,7 +115,8 @@ guest gets a `401` from), audio kept on disk, and several songs at once.
 - `audio/` — the analysis pipeline:
   - `decode.py` — ffmpeg → mono float32 PCM; `ffmpeg_available()`.
   - `analyzer.py` — the three engines + `AnalysisResult`; silence trimming.
-  - `beatgrid.py` — pure beat↔time conversion over the grid.
+  - `beatgrid.py` — pure beat↔time conversion over the grid, plus the snapping rules
+    (`snap_half` for edits, `snap_chart_beat` for seeding) and `whole_bpm`.
   - `key_estimation.py` — tonic pitch class + mode from chroma.
   - `recognizer.py` — extension-tolerant cosine template matching; per-frame emissions.
   - `decoding.py` — Viterbi decode over those emissions (`change_penalty` self-stay bias).
@@ -160,8 +173,12 @@ Common flow:
 5. Chords — engine-specific (template+Viterbi / Chordino / BTC). Segments shorter than
    `TABIT_ANALYSIS_MIN_SEGMENT_SECONDS` (0.75) are dropped as false positives.
 6. Write the immutable `Analysis` (bpm, key, engine_version, beat_times).
-7. `_seed_chart` — build the grid, convert each segment's end to beats, `snap_half`,
-   clamp to `total_beats(grid, duration)`, and lay chords out contiguously from beat 0.
+7. `_seed_chart` → `build_chart_seed` (`app/chart_seed.py`) — build the grid, convert
+   each segment's end to beats, `snap_chart_beat` (whole beat, with the bar-line pull from
+   `TABIT_CHART_BAR_PULL_BEATS`), clamp to `total_beats(grid, duration)`, and lay chords
+   out contiguously from beat 0. Interior chords shorter than one beat are dropped as
+   collapsed boundaries; the *final* chord may be as short as a half-beat, because it clamps
+   to the recording's fractional end and a real tail chord must not be lost.
 
 Status lifecycle, polled via `GET /api/recordings/{id}/analysis`:
 `pending → running → done | failed` (on failure, `Analysis.error` carries the reason).
@@ -176,7 +193,8 @@ Status lifecycle, polled via `GET /api/recordings/{id}/analysis`:
 - **Charts** (`/api`): `POST /recordings/{rid}/chart`, `GET /recordings/{rid}/chart`,
   `POST /charts/{cid}/segments`, `PATCH /charts/{cid}/segments/{sid}`,
   `PATCH /charts/{cid}/segments` (batch resize), `DELETE /charts/{cid}/segments/{sid}`,
-  `PATCH /charts/{cid}/settings` (beats-per-measure, measure offset),
+  `PATCH /charts/{cid}/settings` (beats-per-measure, measure offset, key tonic/mode —
+  re-reads the numerals, never moves a chord),
   `PATCH /charts/{cid}/tempo` (set BPM — a whole number, rounded if not; re-indexes the
   grid, rescales every segment),
   `POST /charts/{cid}/transpose`.
@@ -230,7 +248,10 @@ finished and the file has been deleted).
   - Zone 1 — `ChartContextBar`: title, back link, mode actions. Dims while the song plays
     (chrome you're not using is chrome in the way when your eyes are on your hands) but
     never disappears — it stays in the DOM, focusable, one Tab away.
-  - Zone 2 — `Timeline` (the chord grid), `SegmentEditor`, `KeyControl` (click-to-edit key
+  - Zone 2 — `Timeline` (the chord sheet as a grid of **bars** — `buildBars` splits each
+    segment into per-bar fragments; the resize handle and the `<button>` ride on the
+    fragment that carries the chord's real start, the progress fill on every box of the
+    active chord), `SegmentEditor`, `KeyControl` (click-to-edit key
     correction: re-reads the same chords' roman numerals against a new tonic/mode, never
     moves a chord — `PATCH /charts/{id}/settings`), `TransposeControl`, `TempoControl`,
     `TimeSignatureControl`.
@@ -248,8 +269,11 @@ finished and the file has been deleted).
   - `musicalPosition` — bar/beat-from-seconds math off the beat grid; what `WhereAmI` and
     the scrubber's `aria-valuetext` both read from.
   - `chordProgress` (paints the active chord's fill bar as a CSS transition timed to its
-    remaining real time), `chartLayout` (wrapping/layout), `beatGrid` + `beatMath` (beat
-    math, half-beat snapping), `timeMath` (pixel↔time, centisecond formatting), `useChart`
+    remaining real time), `barLayout` (segments + meter → bars and fragments, pure and
+    DOM-free), `chartLayout` (boundary-drag and resize patch ordering, so a PATCH never
+    transiently overlaps a neighbour), `beatGrid` (`totalBeats`, `timeForBeat` — the port of
+    `beatgrid.py`) + `beatMath` (half-beat snapping), `timeMath` (pixel↔time, centisecond
+    formatting), `useChart`
     (query/mutation hook), `useRecording`, `useReanalyze`, `useMediaClock` (the underlying
     playback clock `PlaybackContext` wraps).
 - `guest/` — `useGuestSong`: holds the visitor's File for playback (the server deleted its
@@ -309,8 +333,9 @@ one to reveal it. Analysis is unchanged — the same chart, shown differently.
   and **re-seeds the chart, overwriting the user's manual edits.**
 - A chart must **never exceed the recording's duration** — `end_beat` is bounded by
   `total_beats(grid, duration)`, and `duration` is the server-decoded length.
-- Chart positions are **beats**, snapped to the **half-beat**; derived times are
-  displayed to the **centisecond**. (`docs/TODO.md` #7 originally asked for millisecond
+- Chart positions are **beats**, snapped to the **half-beat** on edit and to the
+  **whole beat** (bar-line pull `< 1.0`) at seed time; derived times are displayed to the
+  **centisecond**. (`docs/TODO.md` #7 originally asked for millisecond
   precision; Round 2 #5 reduced *display* to the centisecond, and the beat-native rewrite
   made *editing* half-beat-quantized. The code is the contract.)
 - Chord boundaries should reflect the *actual* change point; leading/trailing silence

@@ -6,30 +6,41 @@ from app.audio.deep_chord import frames_to_segments, reduce_btc_label
 from app.music_theory import Quality
 
 
-def test_reduce_btc_label_core_qualities():
-    assert reduce_btc_label("C:maj") == (0, Quality.MAJ)
-    assert reduce_btc_label("A:min") == (9, Quality.MIN)
-    assert reduce_btc_label("G:7") == (7, Quality.DOM7)
-    assert reduce_btc_label("D:maj7") == (2, Quality.MAJ7)
-    assert reduce_btc_label("E:min7") == (4, Quality.MIN7)
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        # core qualities
+        ("C:maj", (0, Quality.MAJ)),
+        ("A:min", (9, Quality.MIN)),
+        ("G:7", (7, Quality.DOM7)),
+        ("D:maj7", (2, Quality.MAJ7)),
+        ("E:min7", (4, Quality.MIN7)),
+        # accidentals in the root spelling
+        ("Bb:min", (10, Quality.MIN)),
+        ("F#:maj", (6, Quality.MAJ)),
+        # slash bass is dropped, quality preserved
+        ("C:maj/3", (0, Quality.MAJ)),
+        # bare root (no shorthand) reads as major
+        ("C", (0, Quality.MAJ)),
+    ],
+)
+def test_reduce_btc_label_parses_root_quality_and_drops_bass(label, expected):
+    assert reduce_btc_label(label) == expected
 
 
-def test_reduce_btc_label_accidentals_and_slash_bass():
-    assert reduce_btc_label("Bb:min") == (10, Quality.MIN)
-    assert reduce_btc_label("F#:maj") == (6, Quality.MAJ)
-    # slash bass is dropped, quality preserved
-    assert reduce_btc_label("C:maj/3") == (0, Quality.MAJ)
-
-
-def test_reduce_btc_label_extended_vocab_collapses():
-    assert reduce_btc_label("C:hdim7") == (0, Quality.MIN)
-    assert reduce_btc_label("C:dim7") == (0, Quality.MIN)
-    assert reduce_btc_label("C:sus4") == (0, Quality.MAJ)
-    assert reduce_btc_label("C:aug") == (0, Quality.MAJ)
-    assert reduce_btc_label("C:minmaj7") == (0, Quality.MIN7)
-    assert reduce_btc_label("C:maj9") == (0, Quality.MAJ7)
-    # bare root (no shorthand) reads as major
-    assert reduce_btc_label("C") == (0, Quality.MAJ)
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        ("C:hdim7", (0, Quality.MIN)),
+        ("C:dim7", (0, Quality.MIN)),
+        ("C:sus4", (0, Quality.MAJ)),
+        ("C:aug", (0, Quality.MAJ)),
+        ("C:minmaj7", (0, Quality.MIN7)),
+        ("C:maj9", (0, Quality.MAJ7)),
+    ],
+)
+def test_reduce_btc_label_collapses_extended_vocab_to_the_five_qualities(label, expected):
+    assert reduce_btc_label(label) == expected
 
 
 def test_reduce_btc_label_no_chord_and_garbage():

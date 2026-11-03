@@ -30,17 +30,12 @@ describe("WhereAmI", () => {
   });
 
   it("reports the position into a polite live region when pressed", async () => {
+    // Polite, not assertive: aria-live="assertive" would cut across whatever the screen
+    // reader was saying. The user asked a question; they can wait a beat for the answer.
     renderIt();
     await userEvent.click(screen.getByRole("button", { name: /where am i/i }));
     const region = screen.getByRole("status");
     expect(region).toHaveTextContent(/bar 1, beat 1/i);
-  });
-
-  it("is polite, not assertive — it must never interrupt", async () => {
-    // aria-live="assertive" would cut across whatever the screen reader was saying.
-    // The user asked a question; they can wait a beat for the answer.
-    renderIt();
-    await userEvent.click(screen.getByRole("button", { name: /where am i/i }));
-    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
+    expect(region).toHaveAttribute("aria-live", "polite");
   });
 });

@@ -37,37 +37,26 @@ test("omits the length when the duration is unknown", () => {
 
 const detected = { ...base, status: "done" as const, bpm: 144, detected_key_tonic: "C", detected_key_mode: "major" };
 
-test("shows the tempo and key the player set, not the ones the engine detected", () => {
-  const { container } = render(
-    <AnalysisStatusBadge analysis={detected} chart={{ bpm: 72, key_tonic: "A", key_mode: "minor" }} />,
-  );
-  expect(container.textContent).toBe("done · 72 BPM · A minor");
-});
-
-test("falls back to the detected tempo and key when there is no chart yet", () => {
-  const { container } = render(<AnalysisStatusBadge analysis={detected} chart={null} />);
-  expect(container.textContent).toBe("done · 144 BPM · C major");
-});
-
-test("falls back to the detected tempo when the chart carries no tempo of its own", () => {
-  const { container } = render(
-    <AnalysisStatusBadge analysis={detected} chart={{ bpm: null, key_tonic: "A", key_mode: "minor" }} />,
-  );
-  expect(container.textContent).toBe("done · 144 BPM · A minor");
-});
-
-test("has no inline styles left", () => {
-  const { container } = render(<AnalysisStatusBadge analysis={{ ...base, status: "failed", error: "boom" }} />);
-  const styled = container.querySelectorAll("[style]");
-  expect(
-    Array.from(styled).map((e) => e.outerHTML.slice(0, 80)),
-    "AnalysisStatusBadge must carry no inline styles — colour must come from a class",
-  ).toEqual([]);
-});
+test.each([
+  // [chart prop, expected badge text] — the chart's value wins per field, falling back to the
+  // detected value only where the chart carries none.
+  [{ bpm: 72, key_tonic: "A", key_mode: "minor" }, "done · 72 BPM · A minor"],
+  [null, "done · 144 BPM · C major"],
+  [{ bpm: null, key_tonic: "A", key_mode: "minor" }, "done · 144 BPM · A minor"],
+])(
+  "shows the player's tempo and key, falling back to the detected values per field (%o → %s)",
+  (chart, expected) => {
+    const { container } = render(<AnalysisStatusBadge analysis={detected} chart={chart} />);
+    expect(container.textContent).toBe(expected);
+  },
+);
 
 test("carries the status as a class, so colour is never the only channel", () => {
   const { container } = render(<AnalysisStatusBadge analysis={{ ...base, status: "failed", error: "boom" }} />);
   // The status word ("failed") is always in the text too — the class only supplements it.
   expect(container.querySelector(".status--failed")).not.toBeNull();
   expect(container.textContent).toContain("failed");
+  // ...and colour must come from that class, not from an inline style attribute on any node.
+  const styled = Array.from(container.querySelectorAll("[style]")).map((e) => e.outerHTML.slice(0, 80));
+  expect(styled, "AnalysisStatusBadge must carry no inline styles — colour must come from a class").toEqual([]);
 });

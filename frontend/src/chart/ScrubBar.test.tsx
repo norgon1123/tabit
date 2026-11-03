@@ -84,22 +84,19 @@ test("ignores seeks before duration is known", () => {
 });
 
 describe("the scrubber speaks music, not seconds", () => {
-  it("announces its position as a bar and a beat", () => {
-    // THE point of replacing the native <audio> slider. "87 seconds" tells a musician
-    // nothing; "bar 12, beat 2" tells them where to put their hands.
-    render(<ScrubBar currentTime={4.0} duration={16} playing={false} rate={1} grid={GRID} onSeek={() => {}} />);
-    const slider = screen.getByRole("slider");
-    expect(slider).toHaveAttribute("aria-valuetext", "bar 3, beat 1");
-  });
-
-  it("updates the announcement as it moves", () => {
-    const { rerender } = render(
-      <ScrubBar currentTime={0} duration={16} playing={false} rate={1} grid={GRID} onSeek={() => {}} />,
-    );
+  it("announces its position as a bar and a beat, and tracks it as the song moves", () => {
+    // THE point of replacing the native <audio> slider: "87 seconds" tells a musician nothing;
+    // "bar 12, beat 2" tells them where to put their hands — and the announcement must follow a
+    // changing currentTime, so drive it across several positions on the same instance.
+    const props = { duration: 16, playing: false, rate: 1, grid: GRID, onSeek: () => {} } as const;
+    const { rerender } = render(<ScrubBar currentTime={0} {...props} />);
     expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "bar 1, beat 1");
 
-    rerender(<ScrubBar currentTime={2.5} duration={16} playing={false} rate={1} grid={GRID} onSeek={() => {}} />);
+    rerender(<ScrubBar currentTime={2.5} {...props} />);
     expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "bar 2, beat 2");
+
+    rerender(<ScrubBar currentTime={4.0} {...props} />);
+    expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "bar 3, beat 1");
   });
 
   it("is not a live region — it must not announce while the song plays", () => {

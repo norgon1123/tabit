@@ -9,6 +9,7 @@ seconds; callers shift detected onsets to that frame before building the grid.
 from __future__ import annotations
 
 import bisect
+import math
 
 _DEFAULT_BPM = 120.0
 
@@ -16,6 +17,54 @@ _DEFAULT_BPM = 120.0
 def snap_half(beat: float) -> float:
     """Round a beat position to the nearest half-beat (eighth)."""
     return round(beat * 2.0) / 2.0
+
+
+def _round_half_up(value: float) -> float:
+    """Nearest integer, with .5 always going UP.
+
+    Python's built-in round() is banker's rounding: round(6.5) == 6 but round(7.5) == 8.
+    Where a chord boundary lands must not depend on the parity of the beat it happens to
+    sit near, so this rule is spelled out rather than inherited.
+    """
+    return float(math.floor(value + 0.5))
+
+
+def snap_chart_beat(
+    beat: float,
+    beats_per_measure: int,
+    measure_offset: int = 0,
+    pull_beats: float = 0.75,
+) -> float:
+    """An engine-detected boundary -> a whole beat, preferring a nearby bar line.
+
+    Two corrections in one, both aimed at the same bias. The engine emits far more spurious
+    half-beat boundaries than real ones, so a boundary is snapped to a whole beat. Chord
+    changes also cluster on downbeats, so a boundary within `pull_beats` of a bar line takes
+    the bar line rather than its nearest beat.
+
+    `pull_beats` MUST be < 1.0. The whole beats of a 4/4 bar sit 1, 2 and 1 beats from the
+    nearest bar line, so a tolerance of 1.0 swallows beats 2 and 4 of every bar — `| C G Am F |`
+    would collapse into one chord. Below 1.0 the rule carries the invariant that makes it safe:
+    **a boundary already ON a whole beat is never relocated**, because its distance to any
+    non-coincident bar line is >= 1 > pull_beats.
+
+    This is a SEED-time rule only. `snap_half` still serves manual edits: a player dragging a
+    boundary knows what they heard, and chord changes on the half beat are real.
+    """
+    if not pull_beats < 1.0:
+        raise ValueError(
+            "pull_beats must be < 1.0: at 1.0 the bar-line pull swallows beats 2 and 4 of "
+            "every 4/4 bar. See docs/superpowers/specs/2026-07-17-bar-native-chord-sheet-design.md"
+        )
+    if beats_per_measure < 1:
+        raise ValueError("beats_per_measure must be >= 1")
+
+    span = float(beats_per_measure)
+    k = _round_half_up((beat - measure_offset) / span)
+    bar = measure_offset + k * span
+    if bar >= 0.0 and abs(beat - bar) <= pull_beats:
+        return float(bar)
+    return max(0.0, _round_half_up(beat))
 
 
 def whole_bpm(bpm: float | None) -> int | None:

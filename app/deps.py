@@ -20,7 +20,13 @@ def _user_for_token(db: DbSession, session_token: str | None) -> User | None:
     row = db.execute(
         select(SessionModel).where(SessionModel.token_hash == hash_token(session_token))
     ).scalar_one_or_none()
-    return row.user if row is not None else None
+    if row is None:
+        return None
+    if row.is_expired(get_settings().session_max_age_seconds):
+        db.delete(row)
+        db.commit()
+        return None
+    return row.user
 
 
 def get_current_user(

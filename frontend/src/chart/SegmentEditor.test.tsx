@@ -42,38 +42,21 @@ describe("SegmentEditor beats", () => {
     expect(beats).toHaveAttribute("min", "0.5");
   });
 
-  it("resizes the segment when a keyboard user presses ArrowUp in the Beats field (no mouse)", () => {
-    // Proves the keyboard path actually reaches redistributeLength/onResize, not just that
-    // the attributes are present. ArrowUp on a number input bumps its value by `step`; the
-    // browser dispatches a change event which changeBeats() must still route to onResize.
-    vi.useFakeTimers();
-    const onResize = vi.fn();
-    renderSegmentEditor({ onResize, debounceMs: 400 });
-    const beats = screen.getByLabelText(/beats/i) as HTMLInputElement;
-    beats.focus();
-    fireEvent.keyDown(beats, { key: "ArrowUp" });
-    // jsdom doesn't natively step number inputs on ArrowUp, so drive the same effect a real
-    // browser would: the value increments by `step` (0.5) and a change event fires.
-    fireEvent.change(beats, { target: { value: String(Number(beats.value) + 0.5) } });
-    act(() => { vi.advanceTimersByTime(400); });
-    expect(onResize).toHaveBeenCalledWith([
-      { id: "s1", start_beat: 0, end_beat: 4.5 },
-      { id: "s2", start_beat: 4.5, end_beat: 8 },
-    ]);
-    vi.useRealTimers();
-  });
-
-  it("redistributes beats to the following chords after the debounce", () => {
+  // Changing the Beats field routes through redistributeLength/onResize after the debounce,
+  // reflowing the following chords. This is also the keyboard-resize path: ArrowUp on the
+  // number input bumps its value by `step` and dispatches the same change event (jsdom
+  // doesn't natively step the input, but :34 pins the step/min attributes that make it so).
+  it.each([
+    [4.5, [{ id: "s1", start_beat: 0, end_beat: 4.5 }, { id: "s2", start_beat: 4.5, end_beat: 8 }]],
+    [6, [{ id: "s1", start_beat: 0, end_beat: 6 }, { id: "s2", start_beat: 6, end_beat: 8 }]],
+  ])("redistributes beats to the following chords after the debounce (%s beats)", (value, expected) => {
     vi.useFakeTimers();
     const onResize = vi.fn();
     render(<SegmentEditor {...baseProps} onResize={onResize} debounceMs={400} />);
     const beats = screen.getByLabelText(/beats/i) as HTMLInputElement;
-    fireEvent.change(beats, { target: { value: "6" } });
+    fireEvent.change(beats, { target: { value: String(value) } });
     act(() => { vi.advanceTimersByTime(400); });
-    expect(onResize).toHaveBeenCalledWith([
-      { id: "s1", start_beat: 0, end_beat: 6 },
-      { id: "s2", start_beat: 6, end_beat: 8 },
-    ]);
+    expect(onResize).toHaveBeenCalledWith(expected);
     vi.useRealTimers();
   });
 

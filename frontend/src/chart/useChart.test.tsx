@@ -166,25 +166,29 @@ function serveLibraryAndChart() {
 // The library and the chart sheet are separate caches over the same song. An edit the
 // player makes on the sheet has to reach the library, or the song reads one tempo in one
 // place and another in the other.
-test("setting the tempo refreshes the library listing", async () => {
+test.each([
+  [
+    "setting the tempo",
+    async (chart: ReturnType<typeof useChart>) => {
+      await chart.setTempo(72);
+    },
+    (listed: NonNullable<ReturnType<typeof useRecordings>["recordings"][number]["chart"]>) =>
+      expect(listed.bpm).toBe(72),
+  ],
+  [
+    "correcting the key",
+    async (chart: ReturnType<typeof useChart>) => {
+      await chart.updateSettings({ key_tonic: "A", key_mode: "minor" });
+    },
+    (listed: NonNullable<ReturnType<typeof useRecordings>["recordings"][number]["chart"]>) =>
+      expect([listed.key_tonic, listed.key_mode]).toEqual(["A", "minor"]),
+  ],
+])("a sheet edit refreshes the library listing (%s)", async (_label, performMutation, assertListed) => {
   serveLibraryAndChart();
   const { result } = renderHook(() => ({ chart: useChart("r1"), library: useRecordings() }), { wrapper });
-  await waitFor(() => expect(result.current.library.recordings[0]?.chart?.bpm).toBe(144));
+  await waitFor(() => expect(result.current.library.recordings[0]?.chart).toBeTruthy());
 
-  await result.current.chart.setTempo(72);
+  await performMutation(result.current.chart);
 
-  await waitFor(() => expect(result.current.library.recordings[0]!.chart!.bpm).toBe(72));
-});
-
-test("correcting the key refreshes the library listing", async () => {
-  serveLibraryAndChart();
-  const { result } = renderHook(() => ({ chart: useChart("r1"), library: useRecordings() }), { wrapper });
-  await waitFor(() => expect(result.current.library.recordings[0]?.chart?.key_tonic).toBe("C"));
-
-  await result.current.chart.updateSettings({ key_tonic: "A", key_mode: "minor" });
-
-  await waitFor(() => {
-    const listed = result.current.library.recordings[0]!.chart!;
-    expect([listed.key_tonic, listed.key_mode]).toEqual(["A", "minor"]);
-  });
+  await waitFor(() => assertListed(result.current.library.recordings[0]!.chart!));
 });

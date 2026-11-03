@@ -69,6 +69,10 @@ def test_analyzes_a_two_chord_song(tmp_path):
     roots = {segment.root_pc for segment in result.segments}
     assert 0 in roots  # C detected somewhere
     assert 7 in roots  # G detected somewhere
+    # beat grid comes back non-empty, ascending, and non-negative
+    assert len(result.beat_times) > 0
+    assert result.beat_times == sorted(result.beat_times)
+    assert all(t >= 0 for t in result.beat_times)
 
 
 def test_chart_never_exceeds_audio_duration(tmp_path):
@@ -109,16 +113,6 @@ def test_analysis_result_has_beat_times_field():
     from app.audio.analyzer import AnalysisResult
     r = AnalysisResult(bpm=120.0, key_tonic_pc=0, key_mode="major", duration=2.0)
     assert r.beat_times == []
-
-
-def test_librosa_analyzer_returns_ascending_beat_times(tmp_path):
-    path = tmp_path / "song.wav"
-    _write_chord_song(path, [(0, 4, 7), (7, 11, 2)])  # C major, then G major
-    from app.audio.analyzer import LibrosaAnalyzer
-    result = LibrosaAnalyzer(sample_rate=22050).analyze(str(path))
-    assert len(result.beat_times) > 0
-    assert result.beat_times == sorted(result.beat_times)
-    assert all(t >= 0 for t in result.beat_times)
 
 
 def test_btc_analyzer_returns_beat_times_past_the_leading_silence(tmp_path, monkeypatch):

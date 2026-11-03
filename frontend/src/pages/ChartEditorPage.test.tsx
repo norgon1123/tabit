@@ -14,13 +14,18 @@ function login() {
 
 const RECORDING = {
   id: "r1", original_filename: "song.m4a", format: "m4a", duration_seconds: 4, status: "uploaded",
-  analysis: { status: "done", bpm: 120, detected_key_tonic: "C", detected_key_mode: "major", engine_version: "template-v1", error: null },
+  analysis: {
+    status: "done", bpm: 120, detected_key_tonic: "C", detected_key_mode: "major",
+    engine_version: "template-v1", error: null, beat_times: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
+  },
 };
+// Charts are beat-native: segments carry start_beat/end_beat on the grid, seconds are derived.
 const CHART = {
   id: "c1", recording_id: "r1", key_tonic: "C", key_mode: "major",
+  beats_per_measure: 4, measure_offset: 0, bpm: 120, beat_times: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
   segments: [
-    { id: "s1", start_time: 0, end_time: 2, chord_root: "C", chord_quality: "maj", roman_numeral: "I" },
-    { id: "s2", start_time: 2, end_time: 4, chord_root: "G", chord_quality: "maj", roman_numeral: "V" },
+    { id: "s1", start_beat: 0, end_beat: 4, start_time: 0, end_time: 2, chord_root: "C", chord_quality: "maj", roman_numeral: "I" },
+    { id: "s2", start_beat: 4, end_beat: 8, start_time: 2, end_time: 4, chord_root: "G", chord_quality: "maj", roman_numeral: "V" },
   ],
 };
 

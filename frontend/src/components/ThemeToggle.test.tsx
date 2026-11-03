@@ -38,11 +38,4 @@ describe("ThemeToggle", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect(screen.getByRole("button", { name: /switch to light/i })).toBeInTheDocument();
   });
-
-  it("does not rely on the icon alone to convey its purpose", () => {
-    // Hue is never the only channel — and neither is a glyph. The button needs a name.
-    renderToggle();
-    const btn = screen.getByRole("button", { name: /switch to/i });
-    expect(btn).toHaveAccessibleName();
-  });
 });
