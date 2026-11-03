@@ -1,0 +1,209 @@
+# WayPoint Project Manifest
+#
+# This file is the central registry for your WayPoint project.
+# Claude reads this file first to understand project structure and state.
+#
+# Structure:
+#   - project: Basic project info
+#   - phases: Workflow phases with their agents and I/O patterns
+#   - agents: Agent personas with their capabilities
+#   - documents: Registry of specs, plans, and tasks with summaries
+#
+# Usage:
+#   - waypoint init: Generates this file
+#   - waypoint sync: Updates document registry from file system
+#   - Phase commands: Read this to understand current state
+#
+# Tips:
+#   - Add summaries and keywords when creating new documents
+#   - Update status as documents move through workflow
+#   - Use keywords for quick semantic lookup
+#
+# Generated: 2026-11-03T20:53:18.404Z
+
+waypoint:
+  version: "1.0"
+  generatedAt: 2026-11-03T20:53:18.403Z
+project:
+  name: tabit
+  type: brownfield
+  track: solo
+  gitRemoteUrl: https://github.com/norgon1123/TabIt.git
+phases:
+  discover:
+    agent: analyst
+    description: Analyze existing codebase or explore problem space
+    inputs:
+      - user-request
+    outputs:
+      - .waypoint/specs/discovery.md
+  brainstorm:
+    agent: brainstorm-coach
+    description: Facilitate creative brainstorming session
+    inputs:
+      - user-request
+      - discovery.md
+    outputs:
+      - .waypoint/specs/brainstorm-{topic}.md
+  constitute:
+    agent: architect
+    description: Review and customize project constitution
+    inputs:
+      - .waypoint/constitution.md
+    outputs:
+      - .waypoint/constitution.md
+  specify:
+    agent: product-manager
+    description: Create feature specification document
+    inputs:
+      - user-request
+      - discovery.md
+    outputs:
+      - .waypoint/specs/{feature}.md
+    templates:
+      - .waypoint/templates/spec-template.md
+  clarify:
+    agent: analyst
+    description: Resolve specification ambiguities
+    inputs:
+      - .waypoint/specs/{feature}.md
+    outputs:
+      - .waypoint/specs/{feature}.md
+  architect:
+    agent: architect
+    description: Create technical design for specification
+    inputs:
+      - .waypoint/specs/{feature}.md
+      - .waypoint/constitution.md
+    outputs:
+      - .waypoint/plans/{feature}.md
+    templates:
+      - .waypoint/templates/plan-template.md
+  plan:
+    agent: scrum-master
+    description: Break technical design into executable tasks
+    inputs:
+      - .waypoint/plans/{feature}.md
+    outputs:
+      - .waypoint/tasks/{feature}/task-{n}.md
+    templates:
+      - .waypoint/templates/task-template.md
+  implement:
+    agent: developer
+    description: Implement task following project conventions
+    inputs:
+      - .waypoint/tasks/{feature}/task-{n}.md
+      - .waypoint/constitution.md
+    outputs:
+      - source-code
+      - tests
+  review:
+    agent: qa
+    description: Review implementation for quality and compliance
+    inputs:
+      - source-code
+      - tests
+      - .waypoint/tasks/{feature}/task-{n}.md
+    outputs:
+      - approval
+      - feedback
+  extend:
+    agent: module-architect
+    description: Add new stacks, architectures, or modules
+    inputs:
+      - user-request
+    outputs:
+      - module-definition
+agents:
+  analyst:
+    role: analyst
+    file: .claude/commands/waypoint/agents/analyst.md
+    capabilities:
+      - discover
+      - clarify
+      - risks
+      - questions
+      - analyze
+  brainstorm-coach:
+    role: brainstorm-coach
+    file: .claude/commands/waypoint/agents/brainstorm.md
+    capabilities:
+      - session
+      - techniques
+      - random
+      - organize
+      - ideate
+  product-manager:
+    role: product-manager
+    file: .claude/commands/waypoint/agents/pm.md
+    capabilities:
+      - spec
+      - story
+      - prioritize
+      - requirements
+  architect:
+    role: architect
+    file: .claude/commands/waypoint/agents/architect.md
+    capabilities:
+      - design
+      - review
+      - adr
+      - layers
+      - constitute
+  scrum-master:
+    role: scrum-master
+    file: .claude/commands/waypoint/agents/sm.md
+    capabilities:
+      - plan
+      - story
+      - estimate
+      - dependencies
+  developer:
+    role: developer
+    file: .claude/commands/waypoint/agents/dev.md
+    capabilities:
+      - implement
+      - test
+      - lint
+      - refactor
+  qa:
+    role: qa
+    file: .claude/commands/waypoint/agents/qa.md
+    capabilities:
+      - review
+      - security
+      - coverage
+      - checklist
+  module-architect:
+    role: module-architect
+    file: .claude/commands/waypoint/agents/modarch.md
+    capabilities:
+      - stack
+      - architecture
+      - examples
+      - validate
+  ux-designer:
+    role: ux-designer
+    file: .claude/commands/waypoint/agents/ux.md
+    capabilities:
+      - design
+      - experience-principles
+      - user-journey
+      - visual-foundation
+      - component-strategy
+      - a11y-audit
+      - lovable-prompt
+      - v0-prompt
+documents:
+  constitution: .waypoint/constitution.md
+  specs:
+    discovery:
+      path: .waypoint/specs/discovery.md
+      status: complete
+      created: 2026-11-03
+      summary: >-
+        Brownfield discovery. Stack/architecture map, WayPoint-vs-code mismatch, 16 risks
+        (security: upload byte cap, rate limiting, session expiry, prod cookie guard).
+      keywords: [discovery, risks, security, constitution, brownfield]
+  plans: {}
+  tasks: {}

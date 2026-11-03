@@ -12,6 +12,32 @@ for the architecture and data model; this file is the *how-to-work* manual.
      a human to change it — REPORT the conflict, do not resolve it.
      ═══════════════════════════════════════════════════════════════════════════════ -->
 
+## Principles and WayPoint
+
+- **Constitution** — `.claude/rules/constitution.md` (auto-loaded; source of truth is
+  `.waypoint/constitution.md`) holds the non-negotiable principles: stack, seams,
+  invariants, security posture. This file is the operational manual; the constitution
+  wins on principle, this file wins on process. UI work also loads
+  `.claude/rules/design-constitution.md`.
+- **Tabit is not layered DDD, uses SQLite, has no Alembic, and authenticates with
+  server-side session cookies — not JWT.** WayPoint templates generated for "FastAPI + DDD"
+  may say otherwise; the constitution takes precedence. Never run `alembic` or add JWT.
+- **WayPoint registry** — read `waypoint.manifest.yaml` for the specs, plans and tasks
+  in flight. Generated documents live in `.waypoint/{specs,plans,tasks}/`; templates and
+  workflows in `.waypoint/templates/` and `.waypoint/workflows/`; config in
+  `.waypoint/config.yaml`. Discovery findings: `.waypoint/specs/discovery.md`.
+- **WayPoint actions** (`.claude/skills/waypoint.*`) — the usual flow is
+  `/waypoint.discover` → `/waypoint.specify` → `/waypoint.clarify` → `/waypoint.architect`
+  → `/waypoint.plan` → `/waypoint.implement` → `/waypoint.review`. Also available:
+  `/waypoint.constitute` (amend the constitution), `/waypoint.design` / `/waypoint.ux`
+  (UI design), `/waypoint.brainstorm`, `/waypoint.test`, `/waypoint.memory-*` (knowledge
+  graph), `/waypoint.refresh-bundle` (pull the latest agents/templates).
+- **Agent personas** for those actions live in `.claude/agents/` (analyst, architect,
+  dev, qa-engineer, ux-designer, …).
+- **Re-running `waypoint init` or `/waypoint.refresh-bundle` may overwrite this file**
+  (`CLAUDE.md` is a symlink to it). Check `git diff AGENTS.md` afterwards and restore the
+  policy zone if it was replaced.
+
 ## Shipping a change
 
 - **The base branch is `main` unless the task explicitly names another one.** Do not

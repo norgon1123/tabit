@@ -1,0 +1,39 @@
+type: brownfield
+track: solo
+language: python
+database: sqlite
+# Kept as `ddd` only because it selects the WayPoint stack bundle. The project's actual
+# architecture is a modular monolith with explicit seams — see .waypoint/constitution.md,
+# which takes precedence over any DDD template text generated from this value.
+architecture: ddd
+deployment:
+  primary: self-hosted
+  targets:
+    - self-hosted
+  environments:
+    - development
+    - production
+stackId: fastapi
+stackName: FastAPI
+orm:
+  name: SQLAlchemy
+  # No migration tool: data is disposable; schema built by create_all on startup.
+  migrationTool: none
+auth:
+  strategy: server-session-cookie
+frontend:
+  framework: react
+unitTest:
+  name: pytest
+  command: pytest
+frontendTest:
+  name: Vitest
+  command: cd frontend && npm test
+linter:
+  name: Ruff
+  command: ruff check .
+formatter:
+  name: Ruff
+  command: ruff format --check .
+memory:
+  contentCaptureConsent: false
