@@ -74,6 +74,15 @@ def _clear_settings_cache():
 
 
 @pytest.fixture(autouse=True)
+def _clear_rate_limiter():
+    """Request budgets are process-wide; one test's attempts must not spend another's."""
+    from app.rate_limit import get_rate_limiter
+    get_rate_limiter.cache_clear()
+    yield
+    get_rate_limiter.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _clear_guest_store():
     """The guest store is a process-wide singleton; one test's guest must not be another's."""
     from app.guest import get_guest_store

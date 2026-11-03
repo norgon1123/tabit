@@ -68,11 +68,25 @@ Settings live in `app/config.py` (pydantic-settings; reads `.env`).
 
 - `TABIT_DATABASE_URL` (default `sqlite:///./tabit.db`)
 - `TABIT_STORAGE_DIR` (default `./storage`)
+- `TABIT_ENVIRONMENT` (default `development`; `production` refuses to start unless
+  `TABIT_COOKIE_SECURE=true`)
 - `TABIT_COOKIE_SECURE` (default `false`; `true` behind HTTPS)
 - `TABIT_SESSION_COOKIE_NAME` (default `tabit_session`) /
-  `TABIT_SESSION_MAX_AGE_SECONDS` (default one year)
+  `TABIT_SESSION_MAX_AGE_SECONDS` (default one year; enforced server-side — an older
+  session is refused and deleted, whatever the cookie says)
 - `TABIT_MAX_RECORDING_SECONDS` (default `600`, i.e. 10 minutes; longer uploads are
   rejected with `413`)
+- `TABIT_MAX_UPLOAD_BYTES` (default 200 MB; larger uploads are rejected with `413`, counted
+  on the incoming stream before anything is parsed or spooled to disk)
+- `TABIT_MAX_BODY_BYTES` (default 1 MB; the same stream cap for every non-upload request)
+- `TABIT_AUTH_RATE_LIMIT` / `TABIT_AUTH_RATE_WINDOW_SECONDS` (default `10` per `60`;
+  login + register attempts per client IP, then `429` with `Retry-After`)
+- `TABIT_UPLOAD_RATE_LIMIT` / `TABIT_UPLOAD_RATE_WINDOW_SECONDS` (default `20` per `3600`;
+  uploads per client IP). `0` disables a limit. Limits are in-process and reset on
+  restart. **Behind a reverse proxy, start uvicorn with
+  `--forwarded-allow-ips=<proxy IP>`**, or every visitor shares the proxy's budget (the
+  default trusts only `127.0.0.1`). Never use `'*'` while the app port is directly
+  reachable — anyone could forge `X-Forwarded-For` and dodge the limit.
 
 **Analysis**
 

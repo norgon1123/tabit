@@ -41,6 +41,15 @@ class Session(Base):
 
     user: Mapped[User] = relationship(back_populates="sessions")
 
+    def is_expired(self, max_age_seconds: float, now: datetime | None = None) -> bool:
+        """Past its max age. The cookie's max-age is only advice to the browser; this is the
+        server's own word, so a copied token stops working on schedule too."""
+        created = self.created_at
+        if created.tzinfo is None:  # SQLite hands timestamps back naive; they were UTC
+            created = created.replace(tzinfo=timezone.utc)
+        age = ((now or _now()) - created).total_seconds()
+        return age > max_age_seconds
+
 
 class Recording(Base):
     __tablename__ = "recordings"

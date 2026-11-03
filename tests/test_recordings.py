@@ -67,6 +67,120 @@ def test_upload_rejects_recording_longer_than_ten_minutes(client, tmp_path, monk
     assert client.get("/api/recordings").json() == []  # nothing persisted
 
 
+@pytest.mark.parametrize("signed_in", [True, False], ids=["user", "guest"])
+def test_upload_larger_than_byte_cap_is_rejected_before_storage(
+    client, tmp_path, monkeypatch, signed_in
+):
+    """Duration is client-reported and optional, so it cannot bound memory or disk; the byte
+    size must. Guests reach this endpoint without an account, so the cap guards them too."""
+    monkeypatch.setenv("TABIT_STORAGE_DIR", str(tmp_path))
+    monkeypatch.setenv("TABIT_MAX_UPLOAD_BYTES", str(1024 * 1024))
+    if signed_in:
+        _register(client)
+
+    resp = _upload(client, content=b"x" * (2 * 1024 * 1024))
+
+    assert resp.status_code == 413
+    assert "1 MB" in resp.json()["detail"]
+    assert [p for p in tmp_path.rglob("*") if p.is_file()] == []
+
+
+def test_oversized_body_is_refused_from_its_content_length_before_parsing(
+    client, tmp_path, monkeypatch
+):
+    """Multipart parsing spools the whole body to a temp file before any handler runs, so
+    the cap has to bite on the declared length first. Proved on an endpoint whose handler
+    never reads files: without the gate it would answer 422 for the junk body."""
+    monkeypatch.setenv("TABIT_MAX_UPLOAD_BYTES", str(1024 * 1024))
+
+    resp = client.post(
+        "/api/auth/login",
+        content=b"x" * (2 * 1024 * 1024),
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert resp.status_code == 413
+    assert "1 MB" in resp.json()["detail"]
+
+
+def _chunked(body: bytes, chunk: int = 64 * 1024):
+    """A body with no Content-Length: httpx sends an iterator as chunked transfer."""
+    return (body[i : i + chunk] for i in range(0, len(body), chunk))
+
+
+def test_chunked_body_over_the_cap_is_cut_off_mid_stream(client, monkeypatch):
+    """No Content-Length means nothing to check up front, so the stream itself must stop
+    at the cap. Proved on login: if the body were read and parsed, the answer would be 422."""
+    monkeypatch.setenv("TABIT_MAX_BODY_BYTES", str(64 * 1024))
+
+    resp = client.post(
+        "/api/auth/login",
+        content=_chunked(b"x" * (1024 * 1024)),
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert resp.status_code == 413
+
+
+def test_chunked_upload_just_over_the_cap_is_refused_by_the_handler(
+    client, tmp_path, monkeypatch
+):
+    """The stream allows multipart overhead on top of the cap, so a file slightly over it
+    gets through the stream; the handler's own bounded read is what refuses it."""
+    monkeypatch.setenv("TABIT_STORAGE_DIR", str(tmp_path))
+    monkeypatch.setenv("TABIT_MAX_UPLOAD_BYTES", str(1024 * 1024))
+    _register(client)
+    boundary = "tabitboundary"
+    body = (
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
+        f"filename=\"memo.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n"
+    ).encode() + b"x" * (1024 * 1024 + 10) + f"\r\n--{boundary}--\r\n".encode()
+
+    resp = client.post(
+        "/api/recordings",
+        content=_chunked(body),
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+
+    assert resp.status_code == 413
+    assert [p for p in tmp_path.rglob("*") if p.is_file()] == []
+
+
+@pytest.mark.parametrize("size", [0, 1023, 1024])
+def test_read_capped_returns_bodies_up_to_the_cap(size):
+    from app.routers.recordings import read_capped
+
+    assert read_capped(io.BytesIO(b"x" * size), 1024) == b"x" * size
+
+
+@pytest.mark.parametrize("size", [1025, 10 * 1024 * 1024])
+def test_read_capped_refuses_and_stops_reading_past_the_cap(size):
+    """A chunked or lying request can dodge the Content-Length check; the read itself must
+    stop at the cap rather than pull the whole body into memory."""
+    from fastapi import HTTPException
+
+    from app.routers.recordings import read_capped
+
+    src = io.BytesIO(b"x" * size)
+    with pytest.raises(HTTPException) as exc:
+        read_capped(src, 1024)
+    assert exc.value.status_code == 413
+    assert src.tell() == 1025  # one byte past the cap, never the rest of the body
+
+
+def test_uploads_beyond_rate_limit_get_429(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("TABIT_STORAGE_DIR", str(tmp_path))
+    monkeypatch.setenv("TABIT_UPLOAD_RATE_LIMIT", "2")
+    _register(client)
+    assert _upload(client).status_code == 201
+    assert _upload(client).status_code == 201
+
+    resp = _upload(client)
+
+    assert resp.status_code == 429
+    assert int(resp.headers["Retry-After"]) > 0
+
+
 def test_upload_allows_recording_at_the_ten_minute_limit(client, tmp_path, monkeypatch):
     monkeypatch.setenv("TABIT_STORAGE_DIR", str(tmp_path))
     _register(client)
