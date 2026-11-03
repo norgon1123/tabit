@@ -88,11 +88,21 @@ guest gets a `401` from), audio kept on disk, and several songs at once.
 
 ## Backend map (`app/`)
 
-- `main.py` — app construction, router wiring, lifespan: `create_all`, then
+- `main.py` — app construction, `BodyLimitMiddleware` + router wiring, lifespan: refuses to
+  start in production without secure cookies, then `create_all`, then
   `run_additive_migrations`, warns if ffmpeg is missing, purges any guest audio left on disk
   by a process that died mid-analysis (guest data doesn't survive a restart anyway), and
   shuts down the job dispatcher on exit. Health at `GET /api/health`.
-- `config.py` — `TABIT_`-prefixed settings via pydantic-settings (reads `.env`).
+- `config.py` — `TABIT_`-prefixed settings via pydantic-settings (reads `.env`), plus
+  `check_production_safety`, run first in the lifespan.
+- `body_limit.py` — `BodyLimitMiddleware`, a pure-ASGI cap on request bodies, enforced on the
+  stream before FastAPI parses or spools anything: a declared `Content-Length` over the cap is
+  refused, a chunked or understated body is cut off mid-stream (`413`). Uploads
+  (`/api/recordings`) get `TABIT_MAX_UPLOAD_BYTES` plus multipart overhead; everything else
+  gets `TABIT_MAX_BODY_BYTES`. The upload handler's `read_capped` enforces the exact cap.
+- `rate_limit.py` — in-process sliding-window `RateLimiter` and the `limit_auth` /
+  `limit_upload` route dependencies (`429` + `Retry-After`), keyed per client IP. Budgets
+  reset on restart; `0` disables a limit.
 - `db.py`, `models.py`, `schemas.py` — engine/session, ORM models, Pydantic I/O shapes.
 - `migrations.py` — additive, idempotent `ALTER TABLE ... ADD COLUMN` migrations, kept from
   before the DB became disposable. Still runs on startup, but **no new ones are written** —
@@ -100,7 +110,9 @@ guest gets a `401` from), audio kept on disk, and several songs at once.
   runs the same additive step out-of-band against a DB the app isn't currently pointed at;
   it delegates to `run_additive_migrations` rather than adding anything new.
 - `deps.py`, `security.py` — DB/session dependencies, `Principal` (signed-in user *or*
-  guest), current-user + owned-recording resolution, Argon2 hashing.
+  guest), current-user + owned-recording resolution (a session older than
+  `TABIT_SESSION_MAX_AGE_SECONDS` is refused and deleted server-side, whatever the cookie
+  says; login also clears the user's own expired sessions), Argon2 hashing.
 - `guest.py`, `chart_store.py`, `chart_seed.py` — the account-free path: the in-memory guest
   store, the user/guest storage seam the chart router talks to, and the chart seeding both
   analysis paths share (`build_chart_seed` — storage-agnostic; the whole-beat / bar-line
@@ -133,7 +145,8 @@ guest gets a `401` from), audio kept on disk, and several songs at once.
 ## Data model (`app/models.py`)
 
 - **User** — `username` (unique), `password_hash` (Argon2). Owns recordings + sessions.
-- **Session** — server-side session: `token_hash` (the cookie carries the raw token).
+- **Session** — server-side session: `token_hash` (the cookie carries the raw token),
+  `created_at`; `is_expired(max_age_seconds)` is the server's own expiry check.
 - **Recording** — `original_filename`, `format`, `stored_path`, `duration_seconds`,
   `status` (default `uploaded`). 1:1 with Analysis and with ChordChart.
 - **Analysis** — immutable result: `status` (`pending`/`running`/`done`/`failed`),
@@ -186,7 +199,8 @@ Status lifecycle, polled via `GET /api/recordings/{id}/analysis`:
 ## API surface
 
 - **Health**: `GET /api/health`.
-- **Auth** (`/api/auth`): `POST /register`, `POST /login`, `POST /logout`, `GET /me`.
+- **Auth** (`/api/auth`): `POST /register`, `POST /login` (both rate-limited),
+  `POST /logout`, `GET /me`.
 - **Recordings** (`/api/recordings`): `GET ""` (list), `POST ""` (upload),
   `GET /{id}`, `PATCH /{id}` (rename), `GET /{id}/analysis`, `POST /{id}/analyze` (202),
   `GET /{id}/audio`, `DELETE /{id}`.
@@ -201,6 +215,12 @@ Status lifecycle, polled via `GET /api/recordings/{id}/analysis`:
 
 Segment writes are validated against the grid: start < end, no overlap with siblings, and
 `end_beat` must not exceed `total_beats(grid, duration)`.
+
+Request size is bounded separately from duration: an upload over `TABIT_MAX_UPLOAD_BYTES`
+(200 MB) or any other body over `TABIT_MAX_BODY_BYTES` (1 MB) is a `413`, cut off at the
+stream. Login/register and upload are rate-limited per client (`429`); behind a reverse proxy
+uvicorn needs `--forwarded-allow-ips` or all visitors share the proxy's budget.
+`TABIT_ENVIRONMENT=production` refuses to start unless `TABIT_COOKIE_SECURE=true`.
 
 Uploads longer than `TABIT_MAX_RECORDING_SECONDS` (default 600, 10 minutes) are rejected
 with `413` — analysis cost and chart size both scale with length. The check runs twice:

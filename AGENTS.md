@@ -237,7 +237,8 @@ comment in `pyproject.toml` and `docs/technical-plan-phase-0-1.md`.
 ## Where code lives
 
 - **Backend** — REST handlers in `app/routers/` (auth → `/api/auth`, recordings →
-  `/api/recordings`, charts → `/api`); audio logic in `app/audio/`; Pydantic request/
+  `/api/recordings`, charts → `/api`); request-size cap in `app/body_limit.py`, per-client
+  rate limits in `app/rate_limit.py`; audio logic in `app/audio/`; Pydantic request/
   response shapes in `app/schemas.py`; ORM models in `app/models.py`.
 - **Frontend** — data fetching through TanStack Query hooks (`useChart`, `useRecordings`).
   Beat math in `chart/beatMath.ts` (half-beat snap) / `chart/beatGrid.ts` (`totalBeats`,
@@ -262,7 +263,14 @@ Config is env-driven, prefix `TABIT_` (`app/config.py`). Don't hardcode paths or
   `TABIT_ANALYSIS_USE_HPSS` (true), `TABIT_ANALYSIS_ENGINE`
   (`chordino` | `librosa` | `btc`), `TABIT_CHART_BAR_PULL_BEATS` (0.75; seed-time
   bar-line pull; `snap_chart_beat` rejects values ≥ 1.0).
-- Session: `TABIT_SESSION_COOKIE_NAME`, `TABIT_SESSION_MAX_AGE_SECONDS`.
+- Session: `TABIT_SESSION_COOKIE_NAME`, `TABIT_SESSION_MAX_AGE_SECONDS` (also the
+  server-side expiry of a session).
+- Security: `TABIT_ENVIRONMENT` (`development` | `production`; production refuses to start
+  unless `TABIT_COOKIE_SECURE=true`), `TABIT_MAX_UPLOAD_BYTES` (200 MB),
+  `TABIT_MAX_BODY_BYTES` (1 MB; non-upload bodies), `TABIT_AUTH_RATE_LIMIT` (10) /
+  `TABIT_AUTH_RATE_WINDOW_SECONDS` (60), `TABIT_UPLOAD_RATE_LIMIT` (20) /
+  `TABIT_UPLOAD_RATE_WINDOW_SECONDS` (3600); `0` disables a limit. Behind a reverse proxy,
+  start uvicorn with `--forwarded-allow-ips=<proxy IP>`.
 - Guest: `TABIT_GUEST_COOKIE_NAME`, `TABIT_GUEST_TTL_SECONDS`.
 - Multi-instrument: `TABIT_ANALYSIS_DEVICE` (`auto`), `TABIT_ENABLE_SEPARATION` (false),
   `TABIT_SEPARATION_MODEL`, `TABIT_SEPARATION_STEMS`, `TABIT_STEM_STORAGE`,
