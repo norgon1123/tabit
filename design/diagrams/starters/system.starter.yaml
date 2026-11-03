@@ -1,0 +1,11 @@
+# System diagram — scaffolded frame (schema: waypoint:diagram/system@1)
+# Normally DERIVED from the architecture graph. Author one only for a
+# proposed topology. kind: context (yours) | external | store.
+title: "REPLACE: proposed system view"
+contexts:
+  - { id: "bc:REPLACE", label: "REPLACE", kind: "context", rank: 0 }
+  - { id: "external:vendor", label: "Vendor API", kind: "external", rank: 1 }
+  - { id: "store:db", label: "Database", kind: "store", rank: 1 }
+edges:
+  - { from: "bc:REPLACE", to: "external:vendor", label: "pulls statements" }
+  - { from: "bc:REPLACE", to: "store:db", label: "persists" }

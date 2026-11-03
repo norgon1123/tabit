@@ -1,0 +1,43 @@
+{
+  "$id": "waypoint:diagram/erd@1",
+  "title": "Entity-relationship data",
+  "type": "object",
+  "required": ["title", "entities", "relations"],
+  "properties": {
+    "title": { "type": "string" },
+    "entities": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "rank": { "type": "number", "description": "column index (deterministic layout hint); default = declaration order buckets" },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string" },
+                "key": { "type": "string", "enum": ["pk", "fk"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["from", "to", "cardinality"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "cardinality": { "type": "string", "enum": ["1:1", "1:N", "N:1", "N:M", "0..1:N", "1:0..1"] },
+          "label": { "type": "string" }
+        }
+      }
+    }
+  }
+}

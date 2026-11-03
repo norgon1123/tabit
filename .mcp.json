@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "waypoint": {
+      "type": "http",
+      "url": "https://waypoint.copointai.com/api/mcp",
+      "headers": {
+        "X-Waypoint-Project-Id": "0259fe9d-d738-4712-b060-03cc273801ad"
+      }
+    }
+  }
+}

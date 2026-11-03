@@ -1,0 +1,17 @@
+# Implement workflow — memory-bundle-integration MB-FR-010 (AF-4)
+workflow: implement
+steps:
+  - id: orient-resolve
+    file: orient-resolve.md
+    name: Orient & Resolve
+  - id: plan-validate
+    file: plan-validate.md
+    name: Plan & Validate
+  - id: implement-surprise
+    file: implement-surprise.md
+    name: Implement (surprise protocol)
+  - id: delta-complete
+    file: delta-complete.md
+    name: Delta & Complete
+finalOutputs:
+  - implementation + tests passing

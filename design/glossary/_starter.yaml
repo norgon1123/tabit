@@ -1,0 +1,77 @@
+# design/glossary/_starter.yaml — seam ledger starter (schema v1)
+# One ledger per bounded context: copy to design/glossary/{context}.yaml and
+# let /waypoint.design-model ratify it. Zones: shared | ui-only | domain-only.
+# Mappings (shared only): same | renamed | projection.
+# status: provisional entries pass review until the next design.model run in
+# their context (D3), which must ratify or reject them.
+version: 1
+context: _starter
+
+# Canonical verbs — each owns exactly one semantic; labels use verb + noun.
+verbs:
+  create: makes a new object            # banned as synonyms: new (as verb), make
+  add: attaches an existing object
+  edit: mutates an object               # banned: change, modify, update (as labels)
+  save: commits a form
+  cancel: abandons a form
+  delete: destroys permanently          # banned: erase, destroy, trash
+  remove: detaches, recoverable
+  view: navigates to detail             # banned: show, display, open (for detail nav)
+  duplicate: copies an object
+  archive: hides, reversibly
+  restore: reverses archive
+  search: full-text find
+  filter: narrows a list
+  sort: orders a list
+  reorder: changes sibling order       # banned as labels: move up, move down
+  enroll: binds self to a track/plan
+  start: begins a session (lesson, quiz, run)
+  export: produces a file
+  import: ingests a file
+  invite: adds a person by contact
+  assign: binds a person to an object
+  unassign: unbinds a person
+  enable: turns a setting on
+  disable: turns a setting off
+  close: dismisses, preserving state    # never interchangeable with cancel
+
+# Roles (DC-FR-014) — every role a CTA row references must be declared here.
+# Owned by _shared (org-governed); context ledgers may not redefine a role.
+roles:
+  member:
+    definition: any authenticated member of the organization
+    provenance: org default
+  admin:
+    definition: organization administrator (manages members, settings, billing)
+    provenance: org default
+
+# Org default nouns — extend per context. Example entries showing every zone:
+terms:
+  organization:
+    zone: shared
+    status: ratified
+    mapping: renamed
+    domain: [concept:organization]
+    domain_aliases_hidden: [tenant, org]
+    banned_synonyms: [workspace, account]
+  project:
+    zone: shared
+    status: ratified
+    mapping: same
+    domain: [agg:project]
+    banned_synonyms: [repo]
+  dashboard:
+    zone: ui-only
+    rationale: presentation grouping; no domain identity
+
+ctas: []
+# ctas:
+#   - object: statement
+#     verb: archive
+#     roles: [admin]                   # every role declared in _shared roles:
+#     command: cmd:archive-usage-statement
+#     severity: recoverable            # recoverable | irreversible | irreversible-high-value
+#     surface: inline                  # inline | dialog | drawer | page
+#     why: admins tidy closed periods without destroying the record   # required on new rows (DC-FR-010)
+#     condition: { ownership: any, states: [closed] }   # optional — own|others|any; lifecycle states
+#     placements: [statement-list, statement-detail]    # optional — screens carrying the CTA

@@ -1,0 +1,16 @@
+# design/debt.yaml — design debt ledger (schema v1)
+# MACHINE-WRITTEN ONLY. Appended by actions when a design suggestion is
+# declined (D2); entries are review findings until a design action resolves
+# them. Cleared by setting `resolved` — never by deleting history.
+# Kinds: design gaps (default), `trigger: migration` (brownfield relabels),
+# and `kind: comprehension` — unmapped vocabulary, unmappable workflows, or
+# unanswered schema questions hit during implement (never guessed through).
+version: 1
+entries: []
+# entries:
+#   - date: 2026-09-05
+#     context: billing
+#     artifact: objects        # glossary | objects | flows
+#     trigger: new-cta
+#     task: usage-statements
+#     resolved: null           # or the design action run that cleared it

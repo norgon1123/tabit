@@ -1,0 +1,8 @@
+# design/coverage.yaml — design coverage map (schema v1)
+# MACHINE-WRITTEN ONLY: stamped by /waypoint.design-* actions; hand edits are
+# a review finding. States: missing | provisional | draft | ratified | stale.
+# Post-v2 `ratified` stamps carry `ratified_by` (the human at the checkpoint —
+# DC-FR-023); a ratified stamp without it is a gate finding (v1 stamps are
+# grandfathered until re-ratification). Agents stamp only `provisional`.
+version: 1
+contexts:

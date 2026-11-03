@@ -33,3 +33,4 @@ vendor/btc/weights/
 
 # Local Claude worktrees
 .claude/worktrees/
+.claude/settings.local.json

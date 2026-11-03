@@ -1,0 +1,17 @@
+# Class diagram — scaffolded frame (schema: waypoint:diagram/class@1)
+# Same shape as ERD (entities/relations/rank); use for module/type sketches
+# where attributes are members rather than columns.
+title: "REPLACE: proposed module structure"
+entities:
+  - id: "concept:REPLACE.service"
+    label: "ReplaceService"
+    rank: 0
+    attributes:
+      - { name: "execute(input): Output" }
+  - id: "port:REPLACE.gateway"
+    label: "ReplaceGateway (port)"
+    rank: 1
+    attributes:
+      - { name: "fetch(id): Data" }
+relations:
+  - { from: "concept:REPLACE.service", to: "port:REPLACE.gateway", cardinality: "1:1", label: "depends via" }

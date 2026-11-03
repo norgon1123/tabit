@@ -1,0 +1,35 @@
+type: brownfield
+track: solo
+language: python
+database: postgresql
+architecture: ddd
+deployment:
+  primary: none
+  targets:
+    - none
+  environments:
+    - development
+    - production
+stackId: fastapi
+stackName: FastAPI
+orm:
+  name: SQLAlchemy
+  migrationTool: alembic upgrade head
+auth:
+  strategy: jwt
+frontend:
+  framework: htmx
+unitTest:
+  name: pytest
+  command: pytest
+linter:
+  name: Ruff
+  command: ruff check .
+formatter:
+  name: Ruff
+  command: ruff format --check .
+e2eTest:
+  name: Playwright
+  command: pytest --browser chromium
+memory:
+  contentCaptureConsent: false

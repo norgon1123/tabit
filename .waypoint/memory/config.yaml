@@ -1,0 +1,32 @@
+version: 1
+project: tabit
+group_id: neil-orgon--tabit
+embeddings:
+  model: text-embedding-3-large
+  dimensions: 1536
+auto_capture:
+  enabled: true
+  confidence_threshold: medium
+  require_review: true
+  extract:
+    patterns: true
+    decisions: true
+    error_solutions: true
+    conventions: false
+  exclude_paths:
+    - node_modules/**
+    - "*.test.ts"
+    - "*.spec.ts"
+    - dist/**
+search:
+  default_limit: 5
+  similarity_threshold: 0.6
+  include_relations: true
+  max_relation_depth: 2
+hooks:
+  pre_task:
+    enabled: true
+    timeout: 5000
+  post_task:
+    enabled: true
+    timeout: 10000

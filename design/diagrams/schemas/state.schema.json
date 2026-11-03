@@ -1,0 +1,15 @@
+{
+  "$id": "waypoint:diagram/state@1",
+  "title": "State machine data (mirrors the machine files)",
+  "type": "object",
+  "required": ["title", "id", "initial", "states"],
+  "properties": {
+    "title": { "type": "string" },
+    "id": { "type": "string" },
+    "initial": { "type": "string" },
+    "states": {
+      "type": "object",
+      "description": "state name -> { on: {EVENT: target}, final?: true, note?: string }; declaration order is the layout order"
+    }
+  }
+}

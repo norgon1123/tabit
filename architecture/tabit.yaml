@@ -1,0 +1,43 @@
+# Intended architecture — tabit
+# Semantic sections are authored by /waypoint.specify; structural sections by
+# /waypoint.architect. This file becomes APPROVED_INTENT only after it merges
+# to main and syncs (waypoint memory sync) — the PR is the approval gate.
+version: 1
+
+context:
+  id: bc:tabit
+  name: tabit
+  description: >-
+    TODO: one paragraph — what this bounded context is responsible for.
+
+concepts: []
+  # - id: concept:tabit.example
+  #   kind: concept
+  #   name: Example
+  #   definition: ...
+
+use_cases: []
+  # - id: uc:tabit.do-thing
+  #   name: Do the thing
+  #   actor: engineer
+  #   involves: [concept:tabit.example]
+
+layers: []
+  # - { id: layer:tabit.domain, order: 0, description: pure business logic }
+
+aggregates: []
+ports: []
+adapters: []
+
+rules: []
+  # - id: rule:tabit.no-cross-context
+  #   type: MUST_NOT_DEPEND_ON
+  #   source: bc:tabit
+  #   target: bc:other
+  #   severity: error
+
+code_mapping: []
+  # - { match: 'src/**', realizes_layer: layer:tabit.domain }
+
+target_state: []
+vocabulary: []

@@ -1,0 +1,32 @@
+{
+  "$id": "waypoint:diagram/system@1",
+  "title": "System / context diagram data (C4-ish)",
+  "type": "object",
+  "required": ["title", "contexts", "edges"],
+  "properties": {
+    "title": { "type": "string" },
+    "contexts": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "description": "bc: sid when one exists" },
+          "label": { "type": "string" },
+          "kind": { "type": "string", "enum": ["context", "external", "store"] },
+          "rank": { "type": "number" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "label": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+# Sequence diagram — scaffolded frame (schema: waypoint:diagram/sequence@1)
+# Authored diagrams live at design/diagrams/sequence/{scope}.yaml.
+# ids: use graph sids where they exist (bc:, agg:, port:) — diagrams link
+# into architectural memory through them. Messages render in ARRAY ORDER;
+# order is the layout hint (no auto-layout — you own the story's sequence).
+title: "REPLACE: what this sequence shows"
+actors:
+  - { id: "actor:user", label: "User" }
+  - { id: "bc:REPLACE", label: "REPLACE context" }
+  - { id: "port:REPLACE.dependency", label: "REPLACE dependency" }
+messages:
+  - { from: "actor:user", to: "bc:REPLACE", label: "does the thing" }
+  - { from: "bc:REPLACE", to: "port:REPLACE.dependency", label: "asks for data" }
+  - { from: "port:REPLACE.dependency", to: "bc:REPLACE", label: "returns it", reply: true }
+  - { from: "bc:REPLACE", to: "actor:user", label: "shows the outcome", reply: true }

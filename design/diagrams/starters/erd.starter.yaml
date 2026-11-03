@@ -1,0 +1,22 @@
+# ERD — scaffolded frame (schema: waypoint:diagram/erd@1)
+# Authored ERDs live at design/diagrams/erd/{scope}.yaml. Prefer the DERIVED
+# ERD (regenerates from architecture aggregates + code_mapping) — author one
+# only for proposals that do not exist yet.
+# rank = column index (deterministic placement); entities without rank fill
+# columns in declaration order.
+title: "REPLACE: proposed data model"
+entities:
+  - id: "agg:REPLACE.root"
+    label: "REPLACE Root"
+    rank: 0
+    attributes:
+      - { name: "id", type: "cuid", key: "pk" }
+      - { name: "name", type: "string" }
+  - id: "entity:REPLACE.child"
+    label: "REPLACE Child"
+    rank: 1
+    attributes:
+      - { name: "id", type: "cuid", key: "pk" }
+      - { name: "rootId", type: "cuid", key: "fk" }
+relations:
+  - { from: "agg:REPLACE.root", to: "entity:REPLACE.child", cardinality: "1:N" }

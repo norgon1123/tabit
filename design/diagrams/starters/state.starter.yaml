@@ -1,0 +1,16 @@
+# State machine — scaffolded frame (schema: waypoint:diagram/state@1)
+# Normally DERIVED from design/machines/*.ts (publish the machine data; the
+# diagram regenerates). Author one only for a proposed machine.
+# Declaration order of states = layout order.
+title: "REPLACE: proposed machine"
+id: "REPLACE.machine"
+initial: "idle"
+states:
+  idle:
+    on: { START: "working" }
+  working:
+    on: { DONE: "done", FAILED: "error" }
+  error:
+    on: { RETRY: "working", DISMISS: "idle" }
+  done:
+    final: true

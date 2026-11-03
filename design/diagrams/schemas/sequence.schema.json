@@ -1,0 +1,33 @@
+{
+  "$id": "waypoint:diagram/sequence@1",
+  "title": "Sequence diagram data",
+  "type": "object",
+  "required": ["title", "actors", "messages"],
+  "properties": {
+    "title": { "type": "string" },
+    "actors": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "description": "graph sid when one exists (e.g. bc:reconciliation) — else kebab-case" },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "messages": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["from", "to", "label"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "label": { "type": "string" },
+          "reply": { "type": "boolean", "description": "dashed return arrow" },
+          "note": { "type": "string" }
+        }
+      },
+      "description": "rendered strictly in array order — order IS the layout hint"
+    }
+  }
+}

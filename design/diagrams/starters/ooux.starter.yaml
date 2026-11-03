@@ -1,0 +1,16 @@
+# OOUX object map — scaffolded frame (schema: waypoint:diagram/ooux@1)
+# Normally DERIVED from design/objects/{context}.yaml + the seam ledger.
+# Author one only during early foraging, before the ledger ratifies.
+title: "REPLACE: object map sketch"
+objects:
+  - id: "uiobj:REPLACE.thing"
+    label: "Thing"
+    attributes: ["name", "status", "owner"]
+    ctas:
+      - { verb: "view", surface: "page" }
+      - { verb: "edit", surface: "inline" }
+  - id: "uiobj:REPLACE.other"
+    label: "Other"
+    attributes: ["title"]
+relations:
+  - { from: "uiobj:REPLACE.thing", to: "uiobj:REPLACE.other", cardinality: "1:N" }

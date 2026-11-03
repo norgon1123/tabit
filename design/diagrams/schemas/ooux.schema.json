@@ -1,0 +1,37 @@
+{
+  "$id": "waypoint:diagram/ooux@1",
+  "title": "OOUX object map data",
+  "type": "object",
+  "required": ["title", "objects"],
+  "properties": {
+    "title": { "type": "string" },
+    "objects": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "description": "uiobj/concept sid when one exists" },
+          "label": { "type": "string" },
+          "attributes": { "type": "array", "items": { "type": "string" } },
+          "ctas": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["verb"],
+              "properties": { "verb": { "type": "string" }, "surface": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["from", "to", "cardinality"],
+        "properties": {
+          "from": { "type": "string" }, "to": { "type": "string" },
+          "cardinality": { "type": "string" }, "label": { "type": "string" }
+        }
+      }
+    }
+  }
+}

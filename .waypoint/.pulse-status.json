@@ -1,0 +1,11 @@
+{
+  "pid": 9111,
+  "startedAt": "2026-11-03T21:34:50.032Z",
+  "sessionsTailed": 0,
+  "lastSendAt": "2026-11-03T21:34:09.653Z",
+  "lastSendOk": true,
+  "eventsSent": 1,
+  "samplesSent": 2,
+  "queueDepth": 0,
+  "updatedAt": "2026-11-03T21:34:50.032Z"
+}

@@ -1,0 +1,58 @@
+# design/screens/_starter.yaml — screen contract (schema v1)
+# Copy to design/screens/{context}.{screen}.yaml. ONE screen, ONE mockup.
+#
+# The screen owns how it LOOKS: archetype, wireframe, copy, walkthrough, and
+# the mockup approval. Slices own what FLOWS: command, event, severity,
+# surface, and field lineage — they reference screens by id and never define
+# them. A screen is named by every slice whose CTA lands on it (the studio
+# gallery is named by three), which is why approval lives here and not there.
+version: 1
+context: REPLACE
+screen: REPLACE
+
+# Names a doctrine archetype: list | detail | form | dashboard | wizard.
+# Chosen at design time; mixing or choosing at build time fails review.
+archetype: REPLACE
+
+# The directed ASCII contract. Opaque to the parser — the developer's edit IS
+# the agreement, so it is stored verbatim and never reformatted.
+wireframe: |
+  REPLACE — the wireframe the developer directed
+
+# Authored, never derived. All four empty-state variants are required; a
+# silent blank region is a review failure. Error messages are
+# [what happened] + [how to fix it], with no codes, blame, or apologies.
+copy:
+  empty:
+    first_use: "REPLACE"
+    no_results: "REPLACE"
+    error: "REPLACE"
+    no_permission: "REPLACE"
+  errors: []
+#   errors:
+#     - { case: publish-failed, message: "Publish failed. Check the file type and try again." }
+
+# First-time-user simulation. Presence is gated; content stays advisory (D1).
+walkthrough: []
+# walkthrough:
+#   - { q: knows-what-to-do, finding: "...", resolution: "..." }
+
+# MACHINE-WRITTEN by /waypoint.design-implement step 0, on explicit human
+# approval. Agents never write `approved` or `rejected` (DP-FR-026).
+# content_hash covers this file minus the mockup:/rejections: blocks, plus
+# every contributing slice — so editing any slice that lands on this screen
+# invalidates the approval (AD-3/AD-4).
+# mockup:
+#   state: approved            # proposed | approved | rejected | stale
+#   approved_by: REPLACE
+#   approved_at: 2026-01-01T00:00:00Z
+#   content_hash: REPLACE
+#   artifact: design/mockups/{context}.{screen}.html
+
+# Rejections are retained, not deleted — the refused design is the evidence
+# the next proposal is reviewed against. `scope` decides where the loop
+# restarts: layout returns to design.flow, rendering re-renders in place.
+rejections: []
+# rejections:
+#   - { rejected_by: REPLACE, rejected_at: 2026-01-01T00:00:00Z,
+#       scope: layout, reason: "REPLACE — what was wrong, so it is not re-offered" }

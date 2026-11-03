@@ -1,0 +1,7 @@
+# architecture/_meta.yaml — project ontology extensions (create-only seed)
+# Register custom kinds/rel-types here; they sync with zero migrations.
+# Defaults already registered: bc, agg, entity, vo, concept, policy, uc,
+# port, adapter, layer, rule, adr.
+version: 1
+kinds: []
+rel_types: []
