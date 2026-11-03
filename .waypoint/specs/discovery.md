@@ -95,6 +95,14 @@ Severity: **H** fix before next WayPoint action / exposure · **M** before real 
 | R15 | L | Repo | Binary fixture `tests/Simple I V IV I.m4a` (127 KB) staged; root `node_modules/` (WayPoint tooling) untracked and not in `.gitignore`. | `git status`, `.gitignore` |
 | R16 | L | A11y | `WhereAmI` disabled; real screen-reader / device passes still owed. | `docs/phase-4-audit.md` §"Still owed" |
 
+### Decisions (2026-11-03, project owner)
+
+- **Q1 → constitution amended to match the code** (`.waypoint/constitution.md`,
+  amendment log). Resolves R3. `.waypoint/config.yaml` corrected to match.
+- **Q2 → `AGENTS.md` restored from `HEAD`** with a WayPoint section merged into the policy
+  zone. Resolves R1 on the branch; the main checkout still holds the clobbered copy.
+- **Q6 → self-hosted only, but R5–R8 treated as urgent.**
+
 ## 4. Open questions (need a human decision)
 
 1. **Constitution vs reality** — amend constitution to SQLite + cookie sessions + current
